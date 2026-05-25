@@ -1,24 +1,29 @@
 """
 excel_sync.py
 -------------
-Single source of truth for all Excel read/write operations.
-All other modules call load_sheet() and save_sheet() — never touch openpyxl directly.
+Single source of truth for all data read/write operations.
+Data is stored as CSV files (one per sheet per location) under data/<location>/.
 
-Workbook sheets:
+All other modules call load_sheet() and save_sheet() — never deal with files directly.
+
+On every save_sheet() call the CSV is also committed to GitHub via github_sync so that
+data survives Streamlit Cloud container restarts.  Excel files are never stored on disk;
+use excel_export.generate_workbook_bytes() to produce an in-memory xlsx for download.
+
+Sheets:
   Players      — registered players with skill ratings
   Teams        — formed teams with win/loss counters
   Matches      — full match schedule and results
   MatchStats   — per-player per-match award flags
-  Leaderboard  — auto-computed team standings (derived, overwritten on every save)
-  PlayerStats  — auto-computed player award totals (derived, overwritten on every save)
+  Leaderboard  — auto-computed team standings (derived)
+  PlayerStats  — auto-computed player award totals (derived)
 """
 
+from __future__ import annotations
+
+import io
 import os
-import zipfile
 import pandas as pd
-from openpyxl import load_workbook, Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -28,14 +33,23 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 LOCATIONS = ["Bangalore", "Hyderabad", "Indore"]
 _active_location: str = LOCATIONS[0]
-EXCEL_PATH: str = os.path.join(DATA_DIR, f"tournament_{_active_location.lower()}.xlsx")
 
 
 def set_location(loc: str) -> None:
-    """Switch active location — updates EXCEL_PATH for all subsequent data calls."""
-    global _active_location, EXCEL_PATH
+    """Switch active location — all subsequent data calls use this location's CSV files."""
+    global _active_location
     _active_location = loc
-    EXCEL_PATH = os.path.join(DATA_DIR, f"tournament_{loc.lower()}.xlsx")
+
+
+def _csv_path(sheet_name: str, location: str | None = None) -> str:
+    loc = (location or _active_location).lower()
+    return os.path.join(DATA_DIR, loc, f"{sheet_name.lower()}.csv")
+
+
+def _repo_path(sheet_name: str, location: str | None = None) -> str:
+    """GitHub repo-relative path for a sheet's CSV file."""
+    loc = (location or _active_location).lower()
+    return f"data/{loc}/{sheet_name.lower()}.csv"
 
 # ---------------------------------------------------------------------------
 # Schema constants
@@ -80,104 +94,66 @@ HEADER_COLORS = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _ensure_data_dir() -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
+def _ensure_data_dir(location: str | None = None) -> None:
+    loc = (location or _active_location).lower()
+    os.makedirs(os.path.join(DATA_DIR, loc), exist_ok=True)
 
 
-def _is_valid_workbook() -> bool:
-    """Return True if EXCEL_PATH exists and is a valid xlsx/zip file."""
-    if not os.path.exists(EXCEL_PATH):
-        return False
+def _push(sheet_name: str, df: pd.DataFrame, message: str | None = None) -> None:
+    """Best-effort GitHub commit — never raises."""
     try:
-        with zipfile.ZipFile(EXCEL_PATH):
-            return True
-    except zipfile.BadZipFile:
-        return False
-
-
-def _apply_header_style(ws, color_hex: str) -> None:
-    fill = PatternFill("solid", fgColor=color_hex)
-    font = Font(bold=True, color="FFFFFF")
-    align = Alignment(horizontal="center", vertical="center")
-    for cell in ws[1]:
-        cell.fill = fill
-        cell.font = font
-        cell.alignment = align
-    ws.row_dimensions[1].height = 22
-
-
-def _auto_column_width(ws) -> None:
-    for col in ws.columns:
-        max_len = max(
-            (len(str(cell.value)) if cell.value is not None else 0)
-            for cell in col
+        from modules.github_sync import push_file
+        push_file(
+            _repo_path(sheet_name),
+            df.to_csv(index=False),
+            message or f"Update {sheet_name} data",
         )
-        ws.column_dimensions[get_column_letter(col[0].column)].width = max(max_len + 4, 14)
-
-
-def _write_sheet(wb, sheet_name: str, df: pd.DataFrame) -> None:
-    """Internal: recreate a sheet in `wb` from a DataFrame."""
-    headers = SHEET_HEADERS.get(sheet_name, df.columns.tolist())
-
-    # Remove and recreate the sheet at the same position
-    if sheet_name in wb.sheetnames:
-        position = wb.sheetnames.index(sheet_name)
-        del wb[sheet_name]
-    else:
-        position = len(wb.sheetnames)
-
-    ws = wb.create_sheet(sheet_name, position)
-    ws.append(headers)
-    _apply_header_style(ws, HEADER_COLORS.get(sheet_name, "4472C4"))
-
-    for _, row in df.iterrows():
-        ws.append([
-            (bool(row[col]) if col in ("is_eliminated",) else row.get(col, None))
-            for col in headers
-        ])
-
-    _auto_column_width(ws)
-    ws.freeze_panes = "A2"
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def init_workbook() -> None:
-    """Create the Excel workbook with all sheets and headers if it does not exist."""
+def init_data_store() -> None:
+    """Create empty CSV files for all sheets if they don't exist locally."""
     _ensure_data_dir()
-    if _is_valid_workbook():
-        return
-    if os.path.exists(EXCEL_PATH):
-        os.remove(EXCEL_PATH)  # remove corrupted file before recreating
-
-    wb = Workbook()
-    wb.remove(wb.active)  # remove the default blank sheet
-
     for sheet_name, headers in SHEET_HEADERS.items():
-        ws = wb.create_sheet(sheet_name)
-        ws.append(headers)
-        _apply_header_style(ws, HEADER_COLORS[sheet_name])
-        _auto_column_width(ws)
-        ws.freeze_panes = "A2"
+        path = _csv_path(sheet_name)
+        if not os.path.exists(path):
+            pd.DataFrame(columns=headers).to_csv(path, index=False)
 
-    wb.save(EXCEL_PATH)
+
+# Keep backward-compatible alias used by Main.py
+init_workbook = init_data_store
 
 
 def load_sheet(sheet_name: str) -> pd.DataFrame:
-    """
-    Load a sheet from the workbook into a DataFrame.
-    Returns an empty DataFrame with the correct columns if the sheet is empty
-    or the workbook does not exist yet.
+    """Load a sheet from its CSV file.
+
+    If the local file is absent (e.g. after a Streamlit Cloud container restart),
+    the latest version is pulled from GitHub before falling back to an empty frame.
     """
     _ensure_data_dir()
-    if not os.path.exists(EXCEL_PATH):
-        init_workbook()
-
     expected_cols = SHEET_HEADERS.get(sheet_name, [])
+    path = _csv_path(sheet_name)
+
+    if not os.path.exists(path):
+        # Try to restore from GitHub
+        try:
+            from modules.github_sync import pull_file
+            content = pull_file(_repo_path(sheet_name))
+            if content:
+                df = pd.read_csv(io.StringIO(content))
+                df.to_csv(path, index=False)
+                return df if not df.empty else pd.DataFrame(columns=expected_cols)
+        except Exception:
+            pass
+        return pd.DataFrame(columns=expected_cols)
+
     try:
-        df = pd.read_excel(EXCEL_PATH, sheet_name=sheet_name, engine="openpyxl")
+        df = pd.read_csv(path)
         if df.empty:
             return pd.DataFrame(columns=expected_cols)
         return df
@@ -186,21 +162,15 @@ def load_sheet(sheet_name: str) -> pd.DataFrame:
 
 
 def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
-    """
-    Overwrite a single named sheet in the workbook without affecting other sheets.
-    Automatically calls update_derived_sheets() after saving source data.
+    """Overwrite a sheet's CSV file and commit it to GitHub.
+
+    Automatically recomputes derived sheets (Leaderboard, PlayerStats)
+    when saving source data.
     """
     _ensure_data_dir()
-    if not _is_valid_workbook():
-        if os.path.exists(EXCEL_PATH):
-            os.remove(EXCEL_PATH)
-        init_workbook()
+    df.to_csv(_csv_path(sheet_name), index=False)
+    _push(sheet_name, df)
 
-    wb = load_workbook(EXCEL_PATH)
-    _write_sheet(wb, sheet_name, df)
-    wb.save(EXCEL_PATH)
-
-    # Keep derived sheets in sync after every source-data write
     if sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
         update_derived_sheets()
 
@@ -214,20 +184,16 @@ def get_next_id(sheet_name: str, id_column: str) -> int:
 
 
 def update_derived_sheets() -> None:
-    """
-    Recompute Leaderboard and PlayerStats from source data and overwrite
-    those sheets in the workbook.  Called automatically by save_sheet().
+    """Recompute Leaderboard and PlayerStats from source data and save as CSVs.
+
+    Called automatically by save_sheet() whenever source data changes.
     """
     _ensure_data_dir()
-    if not _is_valid_workbook():
-        return
 
-    teams_df    = load_sheet("Teams")
-    players_df  = load_sheet("Players")
-    ms_df       = load_sheet("MatchStats")
-    matches_df  = load_sheet("Matches")
-
-    wb = load_workbook(EXCEL_PATH)
+    teams_df   = load_sheet("Teams")
+    players_df = load_sheet("Players")
+    ms_df      = load_sheet("MatchStats")
+    matches_df = load_sheet("Matches")
 
     # ---- Leaderboard -------------------------------------------------------
     if not teams_df.empty:
@@ -235,7 +201,7 @@ def update_derived_sheets() -> None:
         lb["wins"]   = pd.to_numeric(lb["wins"],   errors="coerce").fillna(0).astype(int)
         lb["losses"] = pd.to_numeric(lb["losses"], errors="coerce").fillna(0).astype(int)
 
-        # Total points per team (sum of their score in every completed match, win or loss)
+        # Total points per team (sum of score in every completed match)
         if not matches_df.empty:
             done_m = matches_df[matches_df["status"] == "done"].copy()
             if not done_m.empty:
@@ -282,7 +248,9 @@ def update_derived_sheets() -> None:
         ).reset_index(drop=True)
         lb.insert(0, "rank", range(1, len(lb) + 1))
         lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]
-        _write_sheet(wb, "Leaderboard", lb)
+
+        lb.to_csv(_csv_path("Leaderboard"), index=False)
+        _push("Leaderboard", lb, "Update Leaderboard")
 
     # ---- PlayerStats -------------------------------------------------------
     if not players_df.empty:
@@ -310,6 +278,6 @@ def update_derived_sheets() -> None:
 
         ps["total_awards"] = ps[AWARDS].sum(axis=1)
         ps = ps[["player_id", "name", "team_name"] + AWARDS + ["total_awards"]]
-        _write_sheet(wb, "PlayerStats", ps)
 
-    wb.save(EXCEL_PATH)
+        ps.to_csv(_csv_path("PlayerStats"), index=False)
+        _push("PlayerStats", ps, "Update PlayerStats")

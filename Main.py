@@ -29,7 +29,7 @@ st.set_page_config(
 # Bootstrap workbook on first run
 # ---------------------------------------------------------------------------
 render_logo()      # sets active location first
-init_workbook()    # creates location-specific .xlsx if it doesn't exist
+init_workbook()    # creates location-specific CSV files if they don't exist
 
 # ---------------------------------------------------------------------------
 # Load data

@@ -1,2 +1,8 @@
 # Ignore generated tournament Excel files
 /data/*.xlsx
+
+# CSV data files are tracked (GitHub is the persistent store)
+# data/**/*.csv  <-- intentionally NOT ignored
+
+# Streamlit secrets (never commit real tokens)
+.streamlit/secrets.toml
