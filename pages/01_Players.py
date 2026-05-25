@@ -35,31 +35,35 @@ teams_locked = teams_exist  # once teams are built, player list is locked
 if teams_locked:
     st.warning("Teams have been built — player list is locked. Reset teams on the **Teams** page to make changes.")
 else:
-    with st.form("add_player_form", clear_on_submit=True):
-        st.subheader("Add a Player")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            name = st.text_input("Player Name", placeholder="e.g. Rahul Sharma", max_chars=60)
-        with col2:
-            skill = st.slider(
-                "Skill Rating",
-                min_value=1.0, max_value=10.0,
-                value=5.0, step=0.5,
-                help="1 = Beginner · 10 = Expert",
-            )
-        if auth.is_admin():
+    # Only render the interactive add-player form for admins. When not
+    # authenticated, show a simple informational prompt instead — this avoids
+    # Streamlit's "Missing Submit Button" warning caused by a form without
+    # a submit control.
+    if auth.is_admin():
+        with st.form("add_player_form", clear_on_submit=True):
+            st.subheader("Add a Player")
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                name = st.text_input("Player Name", placeholder="e.g. Rahul Sharma", max_chars=60)
+            with col2:
+                skill = st.slider(
+                    "Skill Rating",
+                    min_value=1.0, max_value=10.0,
+                    value=5.0, step=0.5,
+                    help="1 = Beginner · 10 = Expert",
+                )
             submitted = st.form_submit_button("➕ Add Player", width='stretch')
-        else:
-            st.info("Admin-only: unlock via the sidebar to add players.")
-            submitted = False
 
-    if submitted:
-        try:
-            pid = add_player(name, skill)
-            st.success(f'Player **{name.strip()}** added (ID {pid}, skill {skill}).')
-            players_df = load_sheet("Players")
-        except (ValueError, RuntimeError) as e:
-            st.error(str(e))
+        if submitted:
+            try:
+                pid = add_player(name, skill)
+                st.success(f'Player **{name.strip()}** added (ID {pid}, skill {skill}).')
+                players_df = load_sheet("Players")
+            except (ValueError, RuntimeError) as e:
+                st.error(str(e))
+    else:
+        st.subheader("Add a Player")
+        st.info("Admin-only: unlock via the sidebar to add players.")
 
 st.markdown("---")
 
