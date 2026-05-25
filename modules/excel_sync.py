@@ -310,7 +310,7 @@ def update_derived_sheets() -> None:
         lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]
 
         lb.to_csv(_csv_path("Leaderboard"), index=False)
-        _push("Leaderboard", lb, "Update Leaderboard")
+        _mark_dirty("Leaderboard")
 
     # ---- PlayerStats -------------------------------------------------------
     if not players_df.empty:
@@ -340,4 +340,4 @@ def update_derived_sheets() -> None:
         ps = ps[["player_id", "name", "team_name"] + AWARDS + ["total_awards"]]
 
         ps.to_csv(_csv_path("PlayerStats"), index=False)
-        _push("PlayerStats", ps, "Update PlayerStats")
+        _mark_dirty("PlayerStats")
