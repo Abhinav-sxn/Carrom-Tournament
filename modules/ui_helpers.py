@@ -363,6 +363,18 @@ def render_logo() -> None:
     except Exception:
         pass
 
+    # Sync-to-GitHub button (admin only)
+    if auth.is_admin():
+        from modules.excel_sync import sync_to_github
+        if st.sidebar.button("☁️ Sync to GitHub", key="sidebar_sync", width="stretch"):
+            result = sync_to_github()
+            if result["pushed"]:
+                st.sidebar.success(f"✅ Synced {len(result['pushed'])} sheet(s) to GitHub")
+            elif result["failed"]:
+                st.sidebar.warning(f"⚠️ Sync failed for: {', '.join(result['failed'])}")
+            else:
+                st.sidebar.info("Nothing to sync — data is up to date")
+
     # Logo
     logo_file = None
     if _LOGO_DIR.exists():

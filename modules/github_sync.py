@@ -53,11 +53,8 @@ def push_file(repo_path: str, content: str, message: str = "Update tournament da
             repo.update_file(repo_path, message, content, existing.sha, branch=branch)
         except UnknownObjectException:
             repo.create_file(repo_path, message, content, branch=branch)
-    except GithubException as e:
-        try:
-            st.warning(f"⚠️ GitHub push failed: {e}")
-        except Exception:
-            pass
+    except GithubException:
+        raise  # let the caller (sync_to_github) handle and re-queue
 
 
 def pull_file(repo_path: str) -> str | None:

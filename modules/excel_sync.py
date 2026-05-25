@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import io
 import os
+import threading
+import time
 import pandas as pd
 
 # ---------------------------------------------------------------------------
@@ -99,30 +101,67 @@ def _ensure_data_dir(location: str | None = None) -> None:
     os.makedirs(os.path.join(DATA_DIR, loc), exist_ok=True)
 
 
-def _push(sheet_name: str, df: pd.DataFrame, message: str | None = None) -> None:
-    """Best-effort GitHub commit — never raises."""
-    # Only push to GitHub when an admin session has explicitly unlocked admin mode.
-    try:
-        import streamlit as st
-        if not st.session_state.get("is_admin", False):
-            return
-    except Exception:
-        # Not running inside Streamlit (e.g., unit tests) — skip pushing.
-        return
+# ---------------------------------------------------------------------------
+# Deferred GitHub push — dirty tracking + background thread
+# ---------------------------------------------------------------------------
 
-    try:
-        from modules.github_sync import push_file
-        push_file(
-            _repo_path(sheet_name),
-            df.to_csv(index=False),
-            message or f"Update {sheet_name} data",
-        )
-    except Exception as e:
+_dirty_sheets: set[str] = set()
+_dirty_lock   = threading.Lock()
+_bg_thread: threading.Thread | None = None
+_PUSH_INTERVAL = 300  # seconds between automatic background pushes
+
+
+def _mark_dirty(sheet_name: str) -> None:
+    """Flag a sheet as needing a GitHub push."""
+    with _dirty_lock:
+        _dirty_sheets.add(sheet_name)
+
+
+def _bg_push_loop() -> None:
+    """Background daemon: push dirty sheets every _PUSH_INTERVAL seconds."""
+    while True:
+        time.sleep(_PUSH_INTERVAL)
+        sync_to_github()
+
+
+def _ensure_bg_thread() -> None:
+    global _bg_thread
+    if _bg_thread is None or not _bg_thread.is_alive():
+        t = threading.Thread(target=_bg_push_loop, daemon=True, name="github-sync")
+        t.start()
+        _bg_thread = t
+
+
+def sync_to_github() -> dict:
+    """Push all dirty sheets to GitHub immediately.
+
+    Safe to call from any thread — does not use st.session_state or st.warning.
+    Returns {"pushed": [...sheet names...], "failed": [...sheet names...]}.
+    """
+    with _dirty_lock:
+        sheets = list(_dirty_sheets)
+        _dirty_sheets.clear()
+
+    pushed: list[str] = []
+    failed: list[str] = []
+    for sheet_name in sheets:
+        path = _csv_path(sheet_name)
+        if not os.path.exists(path):
+            continue
         try:
-            import streamlit as st
-            st.warning(f"⚠️ GitHub sync error: {e}")
+            df = pd.read_csv(path)
+            from modules.github_sync import push_file
+            push_file(
+                _repo_path(sheet_name),
+                df.to_csv(index=False),
+                f"Sync {sheet_name} data",
+            )
+            pushed.append(sheet_name)
         except Exception:
-            pass
+            failed.append(sheet_name)
+            _mark_dirty(sheet_name)  # re-queue for next attempt
+
+    return {"pushed": pushed, "failed": failed}
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +221,15 @@ def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
     """
     _ensure_data_dir()
     df.to_csv(_csv_path(sheet_name), index=False)
-    _push(sheet_name, df)
+
+    # Mark for deferred GitHub push only when an admin session is active
+    try:
+        import streamlit as st
+        if st.session_state.get("is_admin", False):
+            _mark_dirty(sheet_name)
+            _ensure_bg_thread()
+    except Exception:
+        pass
 
     if sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
         update_derived_sheets()

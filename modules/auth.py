@@ -47,6 +47,12 @@ def admin_widget() -> None:
     if is_admin():
         st.sidebar.success("Admin mode")
         if st.sidebar.button("Log out", key="admin_logout"):
+            # Flush any unsaved changes to GitHub before ending admin session
+            try:
+                from modules.excel_sync import sync_to_github
+                sync_to_github()
+            except Exception:
+                pass
             st.session_state["is_admin"] = False
             st.rerun()
         return
