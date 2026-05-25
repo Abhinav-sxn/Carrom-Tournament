@@ -10,6 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import pandas as pd
 import streamlit as st
 from modules.excel_sync import init_workbook, load_sheet
 from modules.ui_helpers import render_logo, render_df
@@ -69,12 +70,11 @@ st.markdown("---")
 # Tournament champion banner
 # ---------------------------------------------------------------------------
 if not teams_df.empty and not matches_df.empty:
-    active = teams_df[~teams_df["is_eliminated"].apply(
-        lambda x: x is True or x == 1 or str(x).lower() == "true"
-    )]
-    all_done = matches_df["status"].isin(["done", "bye"]).all()
-    if all_done and len(active) == 1:
-        st.success(f"🎉 Tournament Complete! Champion: **{active.iloc[0]['team_name']}** 🏆")
+    finals_rows = matches_df[matches_df["bracket"].str.lower() == "finals"]
+    if not finals_rows.empty and str(finals_rows.iloc[0]["status"]) == "done":
+        champion_id   = int(finals_rows.iloc[0]["winner_id"])
+        champion_name = teams_df.set_index("team_id")["team_name"].to_dict().get(champion_id, f"Team {champion_id}")
+        st.success(f"🎉 Tournament Complete! Champion: **{champion_name}** 🏆")
         st.markdown("---")
 
 # ---------------------------------------------------------------------------
@@ -90,6 +90,31 @@ c2.metric("Teams Active", active_teams, delta=f"{total_teams - active_teams} eli
 c3.metric("Matches Played", played_matches)
 c4.metric("Matches Remaining", remaining_matches)
 
+# ---------------------------------------------------------------------------
+# Upcoming match alert
+# ---------------------------------------------------------------------------
+if not matches_df.empty:
+    upcoming = matches_df[
+        (matches_df["status"] == "scheduled") &
+        (matches_df["bracket"].str.lower() != "bye")
+    ].sort_values(["round", "match_id"]).head(3)
+
+    if not upcoming.empty and not teams_df.empty:
+        name_map = teams_df.set_index("team_id")["team_name"].to_dict()
+        def _tn(tid):
+            if pd.isna(tid): return "—"
+            return name_map.get(int(tid), f"Team {int(tid)}")
+
+        st.markdown("##### ⚡ Upcoming Matches")
+        for _, um in upcoming.iterrows():
+            bracket_label = {"winners": "Winners Bracket", "losers": "Losers Bracket", "finals": "🏆 Finals"}.get(
+                str(um["bracket"]).lower(), str(um["bracket"]).capitalize()
+            )
+            st.info(
+                f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
+                f"🎯 &nbsp; **{_tn(um['team_a_id'])}** &nbsp; vs &nbsp; **{_tn(um['team_b_id'])}**"
+            )
+
 st.markdown("---")
 
 # ---------------------------------------------------------------------------
@@ -101,17 +126,33 @@ left, right = st.columns(2)
 with left:
     st.subheader("🏆 Team Standings")
     if not teams_df.empty:
-        display = teams_df[["team_name", "wins", "losses", "is_eliminated"]].copy()
-        display["wins"]   = display["wins"].fillna(0).astype(int)
-        display["losses"] = display["losses"].fillna(0).astype(int)
+        display = teams_df[["team_id", "team_name", "wins", "losses", "is_eliminated"]].copy()
+        display["wins"]   = pd.to_numeric(display["wins"],   errors="coerce").fillna(0).astype(int)
+        display["losses"] = pd.to_numeric(display["losses"], errors="coerce").fillna(0).astype(int)
+
+        # Compute total points per team from all completed matches
+        if not matches_df.empty:
+            done_m = matches_df[matches_df["status"] == "done"].copy()
+            done_m["team_a_score"] = pd.to_numeric(done_m.get("team_a_score", 0), errors="coerce").fillna(0)
+            done_m["team_b_score"] = pd.to_numeric(done_m.get("team_b_score", 0), errors="coerce").fillna(0)
+            sa = done_m[["team_a_id", "team_a_score"]].rename(columns={"team_a_id": "team_id", "team_a_score": "pts"})
+            sb = done_m[["team_b_id", "team_b_score"]].rename(columns={"team_b_id": "team_id", "team_b_score": "pts"})
+            all_pts = pd.concat([sa, sb], ignore_index=True).dropna(subset=["team_id"])
+            all_pts["team_id"] = pd.to_numeric(all_pts["team_id"], errors="coerce")
+            team_pts = all_pts.groupby("team_id")["pts"].sum().reset_index(name="Points")
+            display = display.merge(team_pts, on="team_id", how="left")
+        else:
+            display["Points"] = 0
+        display["Points"] = display["Points"].fillna(0).astype(int)
+
         display["Status"] = display["is_eliminated"].apply(
             lambda x: "❌ Eliminated" if (x is True or x == 1) else "✅ Active"
         )
-        display = display.drop(columns=["is_eliminated"])
-        display.columns = ["Team", "Wins", "Losses", "Status"]
+        display = display.drop(columns=["is_eliminated", "team_id"])
+        display.columns = ["Team", "Wins", "Losses", "Points", "Status"]
         display = (
             display
-            .sort_values(["Wins", "Losses"], ascending=[False, True])
+            .sort_values(["Points", "Wins", "Losses"], ascending=[False, False, True])
             .reset_index(drop=True)
         )
         display.index += 1

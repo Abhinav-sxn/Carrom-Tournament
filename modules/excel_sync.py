@@ -56,11 +56,12 @@ SHEET_HEADERS = {
     "Matches": [
         "match_id", "round", "team_a_id", "team_b_id",
         "winner_id", "loser_id", "bracket", "status", "date_played",
+        "team_a_score", "team_b_score",
     ],
     "MatchStats": ["stat_id", "match_id", "player_id", "team_id"] + AWARDS,
     "Leaderboard": [
         "rank", "team_id", "team_name",
-        "wins", "losses", "status", "total_awards",
+        "wins", "losses", "status", "total_points", "total_awards",
     ],
     "PlayerStats": ["player_id", "name", "team_name"] + AWARDS + ["total_awards"],
 }
@@ -208,6 +209,7 @@ def update_derived_sheets() -> None:
     teams_df    = load_sheet("Teams")
     players_df  = load_sheet("Players")
     ms_df       = load_sheet("MatchStats")
+    matches_df  = load_sheet("Matches")
 
     wb = load_workbook(EXCEL_PATH)
 
@@ -216,6 +218,28 @@ def update_derived_sheets() -> None:
         lb = teams_df[["team_id", "team_name", "wins", "losses", "is_eliminated"]].copy()
         lb["wins"]   = pd.to_numeric(lb["wins"],   errors="coerce").fillna(0).astype(int)
         lb["losses"] = pd.to_numeric(lb["losses"], errors="coerce").fillna(0).astype(int)
+
+        # Total points per team (sum of their score in every completed match, win or loss)
+        if not matches_df.empty:
+            done_m = matches_df[matches_df["status"] == "done"].copy()
+            if not done_m.empty:
+                done_m["team_a_score"] = pd.to_numeric(done_m["team_a_score"], errors="coerce").fillna(0)
+                done_m["team_b_score"] = pd.to_numeric(done_m["team_b_score"], errors="coerce").fillna(0)
+                score_a = done_m[["team_a_id", "team_a_score"]].rename(
+                    columns={"team_a_id": "team_id", "team_a_score": "score"}
+                )
+                score_b = done_m[["team_b_id", "team_b_score"]].rename(
+                    columns={"team_b_id": "team_id", "team_b_score": "score"}
+                )
+                all_scores = pd.concat([score_a, score_b], ignore_index=True).dropna(subset=["team_id"])
+                all_scores["team_id"] = pd.to_numeric(all_scores["team_id"], errors="coerce")
+                team_pts = all_scores.groupby("team_id")["score"].sum().reset_index(name="total_points")
+                lb = lb.merge(team_pts, on="team_id", how="left")
+            else:
+                lb["total_points"] = 0
+        else:
+            lb["total_points"] = 0
+        lb["total_points"] = lb["total_points"].fillna(0).astype(int)
 
         # Total awards per team
         if not ms_df.empty and not players_df.empty:
@@ -237,11 +261,11 @@ def update_derived_sheets() -> None:
             lambda x: "Eliminated" if (x is True or x == 1) else "Active"
         )
         lb = lb.sort_values(
-            ["wins", "losses", "total_awards"],
-            ascending=[False, True, False],
+            ["total_points", "wins", "losses"],
+            ascending=[False, False, True],
         ).reset_index(drop=True)
         lb.insert(0, "rank", range(1, len(lb) + 1))
-        lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_awards"]]
+        lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]
         _write_sheet(wb, "Leaderboard", lb)
 
     # ---- PlayerStats -------------------------------------------------------

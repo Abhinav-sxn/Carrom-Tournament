@@ -100,6 +100,10 @@ def advance_bracket(completed_match_id: int) -> None:
     if len(active) <= 1:
         return  # tournament over
 
+    # Only 2 active teams remain — finals are triggered manually via schedule_finals_by_points()
+    if len(active) == 2:
+        return
+
     # Teams currently in a scheduled or in-progress match
     pending = matches_df[matches_df["status"].isin(["scheduled", "in_progress"])]
     if not pending.empty:
@@ -117,19 +121,6 @@ def advance_bracket(completed_match_id: int) -> None:
 
     done = matches_df[matches_df["status"] == "done"]
     next_round = int(done["round"].max()) + 1 if not done.empty else 1
-
-    # Finals: only 2 active teams and both are free
-    if len(active) == 2 and len(free) == 2:
-        t1 = int(free.iloc[0]["team_id"])
-        t2 = int(free.iloc[1]["team_id"])
-        _append_match(_make_match(
-            match_id=get_next_id("Matches", "match_id"),
-            round_num=next_round,
-            team_a_id=t1,
-            team_b_id=t2,
-            bracket="finals",
-        ))
-        return
 
     # Teams that have already won a losers-bracket match have used their one rematch.
     # They re-enter the main pool and are NOT eligible for another losers match.
@@ -176,6 +167,75 @@ def advance_bracket(completed_match_id: int) -> None:
         updated = pd.concat([current, pd.DataFrame(new_matches)], ignore_index=True)
         save_sheet("Matches", updated)
 
+    # Auto-schedule finals once every pool match is complete
+    refreshed   = load_sheet("Matches")
+    pool        = refreshed[refreshed["bracket"].str.lower().isin(["winners", "losers"])]
+    finals_set  = (refreshed["bracket"].str.lower() == "finals").any()
+    pool_played = not pool.empty and (pool["status"] == "done").any()
+    pool_clear  = pool_played and not (pool["status"] == "scheduled").any()
+    if pool_clear and not finals_set:
+        try:
+            schedule_finals_by_points()
+        except RuntimeError:
+            pass
+
+
+def schedule_finals_by_points() -> None:
+    """
+    Schedule the championship finals between the top 2 teams by total points
+    accumulated across ALL pool matches (including eliminated teams).
+    Wins are used as tiebreaker when points are equal.
+
+    Raises RuntimeError if finals already scheduled or fewer than 2 teams have scores.
+    """
+    matches_df = load_sheet("Matches")
+    teams_df   = load_sheet("Teams")
+
+    if not matches_df.empty:
+        if (matches_df["bracket"].str.lower() == "finals").any():
+            raise RuntimeError("Finals already scheduled.")
+
+    done_m = matches_df[matches_df["status"] == "done"].copy() if not matches_df.empty else pd.DataFrame()
+
+    if done_m.empty:
+        raise RuntimeError("No completed matches yet — cannot determine top 2 by points.")
+
+    done_m["team_a_score"] = pd.to_numeric(done_m["team_a_score"], errors="coerce").fillna(0)
+    done_m["team_b_score"] = pd.to_numeric(done_m["team_b_score"], errors="coerce").fillna(0)
+
+    team_points: dict[int, int] = {}
+    for _, row in done_m.iterrows():
+        ta = int(row["team_a_id"]) if pd.notna(row["team_a_id"]) else None
+        tb = int(row["team_b_id"]) if pd.notna(row["team_b_id"]) else None
+        if ta is not None:
+            team_points[ta] = team_points.get(ta, 0) + int(row["team_a_score"])
+        if tb is not None:
+            team_points[tb] = team_points.get(tb, 0) + int(row["team_b_score"])
+
+    if len(team_points) < 2:
+        raise RuntimeError("At least 2 teams must have played to schedule finals.")
+
+    team_wins: dict[int, int] = {}
+    if not teams_df.empty:
+        for _, row in teams_df.iterrows():
+            team_wins[int(row["team_id"])] = int(pd.to_numeric(row.get("wins", 0), errors="coerce") or 0)
+
+    sorted_teams = sorted(
+        team_points.keys(),
+        key=lambda tid: (team_points[tid], team_wins.get(tid, 0)),
+        reverse=True,
+    )
+    t1, t2 = sorted_teams[0], sorted_teams[1]
+
+    next_round = int(done_m["round"].max()) + 1
+    _append_match(_make_match(
+        match_id=get_next_id("Matches", "match_id"),
+        round_num=next_round,
+        team_a_id=t1,
+        team_b_id=t2,
+        bracket="finals",
+    ))
+
 
 def get_schedule() -> pd.DataFrame:
     """Return the full match schedule."""
@@ -197,6 +257,7 @@ def reset_schedule() -> None:
     save_sheet("Matches", pd.DataFrame(columns=[
         "match_id", "round", "team_a_id", "team_b_id",
         "winner_id", "loser_id", "bracket", "status", "date_played",
+        "team_a_score", "team_b_score",
     ]))
 
     save_sheet("MatchStats", pd.DataFrame(columns=[
@@ -213,15 +274,17 @@ def reset_schedule() -> None:
 def _make_match(match_id: int, round_num: int, team_a_id: int,
                 team_b_id: int, bracket: str) -> dict:
     return {
-        "match_id":    match_id,
-        "round":       round_num,
-        "team_a_id":   team_a_id,
-        "team_b_id":   team_b_id,
-        "winner_id":   None,
-        "loser_id":    None,
-        "bracket":     bracket,
-        "status":      "scheduled",
-        "date_played": None,
+        "match_id":     match_id,
+        "round":        round_num,
+        "team_a_id":    team_a_id,
+        "team_b_id":    team_b_id,
+        "winner_id":    None,
+        "loser_id":     None,
+        "bracket":      bracket,
+        "status":       "scheduled",
+        "date_played":  None,
+        "team_a_score": None,
+        "team_b_score": None,
     }
 
 

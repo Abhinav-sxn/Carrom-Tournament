@@ -37,12 +37,11 @@ teams_df   = load_sheet("Teams")
 matches_df = load_sheet("Matches")
 
 if not teams_df.empty and not matches_df.empty:
-    active = teams_df[~teams_df["is_eliminated"].apply(
-        lambda x: x is True or x == 1 or str(x).lower() == "true"
-    )]
-    all_done = matches_df["status"].isin(["done", "bye"]).all()
-    if all_done and len(active) == 1:
-        st.success(f"🎉 Tournament Complete! Champion: **{active.iloc[0]['team_name']}** 🏆")
+    finals_rows = matches_df[matches_df["bracket"].str.lower() == "finals"]
+    if not finals_rows.empty and str(finals_rows.iloc[0]["status"]) == "done":
+        champion_id = int(finals_rows.iloc[0]["winner_id"])
+        champion_name = teams_df.set_index("team_id")["team_name"].to_dict().get(champion_id, f"Team {champion_id}")
+        st.success(f"🎉 Tournament Complete! Champion: **{champion_name}** 🏆")
         st.markdown("---")
 
 # ---------------------------------------------------------------------------
@@ -75,8 +74,9 @@ with left:
         st.info("No teams yet.")
     else:
         display = lb_df.copy()
-        display["wins"]   = pd.to_numeric(display["wins"],   errors="coerce").fillna(0).astype(int)
-        display["losses"] = pd.to_numeric(display["losses"], errors="coerce").fillna(0).astype(int)
+        display["wins"]         = pd.to_numeric(display["wins"],         errors="coerce").fillna(0).astype(int)
+        display["losses"]       = pd.to_numeric(display["losses"],       errors="coerce").fillna(0).astype(int)
+        display["total_points"] = pd.to_numeric(display.get("total_points", 0), errors="coerce").fillna(0).astype(int)
         display["total_awards"] = pd.to_numeric(display["total_awards"], errors="coerce").fillna(0).astype(int)
 
         # Status badge
@@ -88,14 +88,16 @@ with left:
             "team_name":    "Team",
             "wins":         "Wins",
             "losses":       "Losses",
+            "total_points": "Points",
             "total_awards": "Awards",
         })
-        display = display[["Rank", "Team", "Wins", "Losses", "Awards", "Status"]]
+        display = display[["Rank", "Team", "Points", "Wins", "Losses", "Awards", "Status"]]
 
         _cm = get_cmaps()
         render_df(
             display.style
-                .background_gradient(subset=["Wins"], cmap=_cm["wins"])
+                .background_gradient(subset=["Points"], cmap=_cm["wins"])
+                .background_gradient(subset=["Wins"],   cmap=_cm["wins"])
                 .background_gradient(subset=["Losses"], cmap=_cm["losses"]),
         )
 

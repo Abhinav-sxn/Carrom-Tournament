@@ -6,14 +6,14 @@ View the full match bracket and schedule.
 import streamlit as st
 import pandas as pd
 from modules.excel_sync import load_sheet
-from modules.match_scheduler import generate_schedule, reset_schedule
+from modules.match_scheduler import generate_schedule, reset_schedule, schedule_finals_by_points
 from modules.ui_helpers import render_logo
 
 st.set_page_config(page_title="Schedule · Carrom Tournament", page_icon="📅", layout="wide", initial_sidebar_state="expanded")
 render_logo()
 
 st.title("📅 Match Schedule")
-st.caption("Double-elimination bracket — 2 losses and a team is out.")
+st.caption("Double-elimination pool play — top 2 by points fight for the championship.")
 st.markdown("---")
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,12 @@ for _, row in display_df.iterrows():
         col_status.markdown(STATUS_BADGE["bye"])
         col_winner.markdown(f"**{team_a}**")
     elif status == "done":
-        col_match.markdown(f"**{team_a}**  vs  **{team_b}**")
+        sa = row.get("team_a_score", None)
+        sb = row.get("team_b_score", None)
+        score_str = ""
+        if sa is not None and sb is not None and str(sa) != "nan" and str(sb) != "nan":
+            score_str = f"  &nbsp;·&nbsp;  **{int(sa)} – {int(sb)}**"
+        col_match.markdown(f"**{team_a}**  vs  **{team_b}**{score_str}", unsafe_allow_html=True)
         col_status.markdown(STATUS_BADGE["done"])
         col_winner.markdown(f"🏆 **{winner}**")
     else:
@@ -148,17 +153,57 @@ for _, row in display_df.iterrows():
         col_winner.markdown("—")
 
 # ---------------------------------------------------------------------------
-# Tournament winner banner
+# Champion banner
 # ---------------------------------------------------------------------------
-active_teams = teams_df[~teams_df["is_eliminated"].apply(
-    lambda x: x is True or x == 1 or str(x).lower() == "true"
-)]
-all_done = (matches_df["status"].isin(["done", "bye"])).all()
-
-if all_done and len(active_teams) == 1:
-    champion = active_teams.iloc[0]["team_name"]
+finals_rows = matches_df[matches_df["bracket"].str.lower() == "finals"] if not matches_df.empty else pd.DataFrame()
+if not finals_rows.empty and str(finals_rows.iloc[0]["status"]) == "done":
+    champion_id = int(finals_rows.iloc[0]["winner_id"])
+    champion    = team_name.get(champion_id, f"Team {champion_id}")
     st.markdown("---")
     st.success(f"🎉 **Tournament Complete!** Champion: **{champion}** 🏆")
+
+# ---------------------------------------------------------------------------
+# Finals — auto-schedule (page-load fallback) or show live preview
+# ---------------------------------------------------------------------------
+else:
+    pool_matches  = matches_df[matches_df["bracket"].str.lower().isin(["winners", "losers"])] if not matches_df.empty else pd.DataFrame()
+    finals_exists = not finals_rows.empty
+    pool_pending  = (pool_matches["status"] == "scheduled").any() if not pool_matches.empty else False
+    any_played    = (matches_df["status"] == "done").any() if not matches_df.empty else False
+
+    if any_played and not finals_exists and not pool_pending:
+        # All pool matches done — auto-schedule finals (fallback if advance_bracket missed it)
+        try:
+            schedule_finals_by_points()
+            st.rerun()
+        except RuntimeError:
+            pass
+
+    elif any_played and not finals_exists:
+        # Pool play still running — show read-only preview of current top 2
+        done_m = matches_df[matches_df["status"] == "done"].copy()
+        done_m["team_a_score"] = pd.to_numeric(done_m["team_a_score"], errors="coerce").fillna(0)
+        done_m["team_b_score"] = pd.to_numeric(done_m["team_b_score"], errors="coerce").fillna(0)
+        tp: dict = {}
+        for _, r in done_m.iterrows():
+            ta = int(r["team_a_id"]) if pd.notna(r["team_a_id"]) else None
+            tb = int(r["team_b_id"]) if pd.notna(r["team_b_id"]) else None
+            if ta: tp[ta] = tp.get(ta, 0) + int(r["team_a_score"])
+            if tb: tp[tb] = tp.get(tb, 0) + int(r["team_b_score"])
+
+        team_wins_map = teams_df.set_index("team_id")["wins"].to_dict() if not teams_df.empty else {}
+        sorted_tids   = sorted(tp, key=lambda x: (tp[x], team_wins_map.get(x, 0)), reverse=True)
+
+        if len(sorted_tids) >= 2:
+            t1_id, t2_id = sorted_tids[0], sorted_tids[1]
+            st.markdown("---")
+            st.subheader("🏆 Finals")
+            st.info(
+                f"Pool play in progress. Current top 2 by points:  \n"
+                f"**1. {team_name.get(t1_id, f'Team {t1_id}')}** — {tp[t1_id]} pts  \n"
+                f"**2. {team_name.get(t2_id, f'Team {t2_id}')}** — {tp[t2_id]} pts  \n\n"
+                f"Finals will be scheduled automatically once all pool matches are complete."
+            )
 
 # ---------------------------------------------------------------------------
 # Reset bracket (admin)

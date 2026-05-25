@@ -1,0 +1,2 @@
+# Ignore generated tournament Excel files
+/data/*.xlsx
