@@ -389,14 +389,19 @@ def render_logo() -> None:
     _render_download_button()
 
 
+@st.cache_data(show_spinner=False, ttl=120)
+def _cached_workbook_bytes(loc: str) -> bytes:
+    """Build the Excel workbook in memory.  Cached for 2 min; busted on any save."""
+    from modules.excel_export import generate_workbook_bytes
+    return generate_workbook_bytes(loc)
+
+
 def _render_download_button() -> None:
     """Render a sidebar button pinned to the bottom to download the active location's Excel file."""
-    # Build the workbook in-memory from current CSVs and offer it for download.
-    from modules.excel_export import generate_workbook_bytes
     loc = st.session_state.get("_location", LOCATIONS[0])
     data_dir = Path(__file__).parent.parent / "data" / loc.lower()
     if data_dir.exists() and any(f.suffix.lower() == ".csv" for f in data_dir.iterdir()):
-        data = generate_workbook_bytes(loc)
+        data = _cached_workbook_bytes(loc)
         filename = f"tournament_{loc.lower()}.xlsx"
         st.sidebar.download_button(
             label="📥",

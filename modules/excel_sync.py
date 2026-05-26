@@ -169,16 +169,68 @@ def sync_to_github() -> dict:
 # ---------------------------------------------------------------------------
 
 def init_data_store() -> None:
-    """Create empty CSV files for all sheets if they don't exist locally."""
+    """On startup pull any missing CSVs from GitHub in parallel, then create empty
+    placeholders for any still absent.  Parallel fetches cut cold-start latency
+    from ~N×0.5 s (sequential) down to ~0.5 s total.
+    """
     _ensure_data_dir()
-    for sheet_name, headers in SHEET_HEADERS.items():
-        path = _csv_path(sheet_name)
-        if not os.path.exists(path):
-            pd.DataFrame(columns=headers).to_csv(path, index=False)
+    missing = [
+        sn for sn in SHEET_HEADERS if not os.path.exists(_csv_path(sn))
+    ]
+
+    if missing:
+        import concurrent.futures
+
+        def _pull_one(sheet_name: str) -> None:
+            try:
+                from modules.github_sync import pull_file
+                content = pull_file(_repo_path(sheet_name))
+                if content:
+                    pd.read_csv(io.StringIO(content)).to_csv(
+                        _csv_path(sheet_name), index=False
+                    )
+                    return
+            except Exception:
+                pass
+            if not os.path.exists(_csv_path(sheet_name)):
+                pd.DataFrame(columns=SHEET_HEADERS[sheet_name]).to_csv(
+                    _csv_path(sheet_name), index=False
+                )
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(len(missing), 6)
+        ) as pool:
+            list(pool.map(_pull_one, missing))
+    else:
+        # All files present locally — nothing to do
+        pass
 
 
 # Keep backward-compatible alias used by Main.py
 init_workbook = init_data_store
+
+
+# ---------------------------------------------------------------------------
+# Cached CSV reader — shared across all Streamlit sessions in this process.
+# Cache is busted in save_sheet() via st.cache_data.clear().
+# Falls back to uncached when running outside Streamlit (unit tests, CLI).
+# ---------------------------------------------------------------------------
+
+def _load_csv_from_path(path: str, sheet_name: str) -> pd.DataFrame:
+    """Read a CSV from disk and return a typed DataFrame."""
+    expected_cols = SHEET_HEADERS.get(sheet_name, [])
+    try:
+        df = pd.read_csv(path)
+        return df if not df.empty else pd.DataFrame(columns=expected_cols)
+    except Exception:
+        return pd.DataFrame(columns=expected_cols)
+
+
+try:
+    import streamlit as _st
+    _load_csv_from_path = _st.cache_data(show_spinner=False)(_load_csv_from_path)
+except Exception:
+    pass  # not running inside Streamlit — use uncached version
 
 
 def load_sheet(sheet_name: str) -> pd.DataFrame:
@@ -192,25 +244,19 @@ def load_sheet(sheet_name: str) -> pd.DataFrame:
     path = _csv_path(sheet_name)
 
     if not os.path.exists(path):
-        # Try to restore from GitHub
+        # Recovery path: pull from GitHub and write to disk, then fall through
         try:
             from modules.github_sync import pull_file
             content = pull_file(_repo_path(sheet_name))
             if content:
                 df = pd.read_csv(io.StringIO(content))
                 df.to_csv(path, index=False)
-                return df if not df.empty else pd.DataFrame(columns=expected_cols)
         except Exception:
             pass
-        return pd.DataFrame(columns=expected_cols)
-
-    try:
-        df = pd.read_csv(path)
-        if df.empty:
+        if not os.path.exists(path):
             return pd.DataFrame(columns=expected_cols)
-        return df
-    except Exception:
-        return pd.DataFrame(columns=expected_cols)
+
+    return _load_csv_from_path(path, sheet_name)
 
 
 def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
@@ -222,9 +268,11 @@ def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
     _ensure_data_dir()
     df.to_csv(_csv_path(sheet_name), index=False)
 
-    # Mark for deferred GitHub push only when an admin session is active
+    # Bust ALL cached reads + workbook so the next rerun sees fresh data,
+    # then mark dirty for deferred GitHub push when admin is active.
     try:
         import streamlit as st
+        st.cache_data.clear()
         if st.session_state.get("is_admin", False):
             _mark_dirty(sheet_name)
             _ensure_bg_thread()
