@@ -26,6 +26,7 @@ def _is_configured() -> bool:
         return False
 
 
+@st.cache_resource(show_spinner=False)
 def _get_repo():
     from github import Github
     g = Github(st.secrets["GITHUB_TOKEN"])

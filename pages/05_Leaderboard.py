@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 from modules.excel_sync import load_sheet, AWARDS
 from modules.leaderboard import get_team_standings, get_player_stats, get_award_leaders
-from modules.ui_helpers import render_logo, get_cmaps, render_df
+from modules.ui_helpers import render_logo, grad_style, render_df
 
 st.set_page_config(page_title="Leaderboard · Carrom Tournament", page_icon="🏆", layout="wide", initial_sidebar_state="expanded")
 render_logo()
@@ -93,12 +93,13 @@ with left:
         })
         display = display[["Rank", "Team", "Points", "Wins", "Losses", "Awards", "Status"]]
 
-        _cm = get_cmaps()
         render_df(
-            display.style
-                .background_gradient(subset=["Points"], cmap=_cm["wins"])
-                .background_gradient(subset=["Wins"],   cmap=_cm["wins"])
-                .background_gradient(subset=["Losses"], cmap=_cm["losses"]),
+            grad_style(
+                display.style,
+                (["Points"], "wins"),
+                (["Wins"],   "wins"),
+                (["Losses"], "losses"),
+            ),
         )
 
 # ---- Player Stats ----------------------------------------------------------
@@ -124,7 +125,7 @@ with right:
         display_ps.index += 1
 
         render_df(
-            display_ps.style.background_gradient(subset=["Total"], cmap=get_cmaps()["awards"]),
+            grad_style(display_ps.style, (["Total"], "awards")),
         )
 
 st.markdown("---")

@@ -6,7 +6,7 @@ Register players and assign skill ratings.
 import streamlit as st
 from modules.excel_sync import load_sheet
 from modules.player_manager import add_player, delete_player
-from modules.ui_helpers import render_logo, get_cmaps, render_df
+from modules.ui_helpers import render_logo, grad_style, render_df
 from modules import auth
 
 st.set_page_config(page_title="Players · Carrom Tournament", page_icon="👤", layout="wide", initial_sidebar_state="expanded")
@@ -84,7 +84,7 @@ else:
 
     # Colour-code skill rating via background gradient
     render_df(
-        display.style.background_gradient(subset=["Skill Rating"], cmap=get_cmaps()["skill"], vmin=1, vmax=10),
+        grad_style(display.style, (["Skill Rating"], "skill", 1, 10)),
     )
 
     # Player count status

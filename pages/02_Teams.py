@@ -6,7 +6,7 @@ View balanced team pairings and assign custom team names.
 import streamlit as st
 from modules.excel_sync import load_sheet
 from modules.team_builder import build_balanced_teams, rename_team, reset_teams, get_team_players
-from modules.ui_helpers import render_logo, get_cmaps, render_df
+from modules.ui_helpers import render_logo, grad_style, render_df
 from modules import auth
 
 st.set_page_config(page_title="Teams · Carrom Tournament", page_icon="🤝", layout="wide", initial_sidebar_state="expanded")
@@ -66,7 +66,7 @@ if not teams_exist:
         preview_df = pd.DataFrame(preview_rows)
         st.markdown("**Preview — balanced pairings:**")
         render_df(
-            preview_df.style.background_gradient(subset=["Avg Skill"], cmap=get_cmaps()["skill"], vmin=1, vmax=10),
+            grad_style(preview_df.style, (["Avg Skill"], "skill", 1, 10)),
         )
 
         skill_spread = round(preview_df["Avg Skill"].max() - preview_df["Avg Skill"].min(), 2)

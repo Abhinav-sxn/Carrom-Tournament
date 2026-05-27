@@ -5,7 +5,6 @@ Shared UI utilities: global CSS, logo display, colormaps.
 
 import streamlit as st
 from pathlib import Path
-from matplotlib.colors import LinearSegmentedColormap
 from .excel_sync import LOCATIONS, set_location
 from . import auth
 
@@ -13,12 +12,39 @@ _LOGO_DIR     = Path(__file__).parent.parent / "assets" / "logo"
 _ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 # ---------------------------------------------------------------------------
-# Colormaps
+# Colormaps — pure Python, no matplotlib required
 # ---------------------------------------------------------------------------
-CMAP_WINS   = LinearSegmentedColormap.from_list("dark_greens", ["#23263A", "#22C55E"])
-CMAP_LOSSES = LinearSegmentedColormap.from_list("dark_reds",   ["#23263A", "#EF4444"])
-CMAP_AWARDS = LinearSegmentedColormap.from_list("dark_amber",  ["#23263A", "#F59E0B"])
-CMAP_SKILL  = LinearSegmentedColormap.from_list("dark_rdylgn", ["#EF4444", "#23263A", "#22C55E"])
+def _parse_stops(hex_list: list) -> list:
+    result = []
+    for h in hex_list:
+        h = h.lstrip("#")
+        result.append((int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)))
+    return result
+
+_GRAD_STOPS: dict = {
+    "wins":   _parse_stops(["#23263A", "#22C55E"]),
+    "losses": _parse_stops(["#23263A", "#EF4444"]),
+    "awards": _parse_stops(["#23263A", "#F59E0B"]),
+    "skill":  _parse_stops(["#EF4444", "#23263A", "#22C55E"]),
+}
+
+def _grad_css(val, stops: list, vmin: float, vmax: float) -> str:
+    """Return a CSS background-color + text-color rule for *val*."""
+    try:
+        x = (float(val) - vmin) / max(vmax - vmin, 1e-9)
+    except (TypeError, ValueError):
+        return ""
+    x = max(0.0, min(1.0, x))
+    n  = len(stops) - 1
+    lo = min(int(x * n), n - 1)
+    t  = x * n - lo
+    r0, g0, b0 = stops[lo]
+    r1, g1, b1 = stops[lo + 1]
+    r = int(r0 + t * (r1 - r0))
+    g = int(g0 + t * (g1 - g0))
+    b = int(b0 + t * (b1 - b0))
+    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return f"background-color: #{r:02x}{g:02x}{b:02x}; color: {'#FFFFFF' if lum < 0.5 else '#000000'}"
 
 # ---------------------------------------------------------------------------
 # CSS (dark)
@@ -334,8 +360,31 @@ _CSS = "<style>" + _CSS_SHARED.format(**_DARK) + "</style>"
 # Public helpers
 # ---------------------------------------------------------------------------
 
-def get_cmaps() -> dict:
-    return dict(wins=CMAP_WINS, losses=CMAP_LOSSES, awards=CMAP_AWARDS, skill=CMAP_SKILL)
+def grad_style(styler, *specs):
+    """Apply color gradients to a pandas Styler — no matplotlib required.
+
+    Each *spec* is a tuple:
+      (subset, cmap_key)                — auto vmin/vmax from column data
+      (subset, cmap_key, vmin, vmax)    — explicit numeric range
+
+    cmap_key: "wins" | "losses" | "awards" | "skill"
+    Returns the modified Styler so it can be passed directly to render_df().
+    """
+    for spec in specs:
+        subset    = spec[0]
+        rgb_stops = _GRAD_STOPS[spec[1]]
+        if len(spec) > 2:
+            v0, v1 = float(spec[2]), float(spec[3])
+            fn = lambda val, s=rgb_stops, a=v0, b=v1: _grad_css(val, s, a, b)
+            styler = (styler.map(fn, subset=subset)
+                      if hasattr(styler, "map")
+                      else styler.applymap(fn, subset=subset))
+        else:
+            def _col(col, s=rgb_stops):
+                lo, hi = float(col.min()), float(col.max())
+                return [_grad_css(v, s, lo, hi) for v in col]
+            styler = styler.apply(_col, axis=0, subset=subset)
+    return styler
 
 
 def render_logo() -> None:
