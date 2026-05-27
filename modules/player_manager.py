@@ -7,7 +7,7 @@ import pandas as pd
 from modules.excel_sync import load_sheet, save_sheet, get_next_id
 
 
-def add_player(name: str, skill_rating: float) -> int:
+def add_player(name: str, skill_rating: float, partner_pref: str = "") -> int:
     """
     Add a new player to the Players sheet.
     Returns the new player_id.
@@ -30,6 +30,7 @@ def add_player(name: str, skill_rating: float) -> int:
         "name":         name,
         "skill_rating": round(float(skill_rating), 1),
         "team_id":      None,
+        "partner_pref": partner_pref.strip(),
     }])
     if df.empty:
         df = new_row

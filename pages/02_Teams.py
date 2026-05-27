@@ -3,9 +3,10 @@
 View balanced team pairings and assign custom team names.
 """
 
+import pandas as pd
 import streamlit as st
 from modules.excel_sync import load_sheet
-from modules.team_builder import build_balanced_teams, rename_team, reset_teams, get_team_players
+from modules.team_builder import build_balanced_teams, get_default_pairing, rename_team, reset_teams, get_team_players
 from modules.ui_helpers import render_logo, grad_style, render_df
 from modules import auth
 
@@ -37,46 +38,122 @@ if not teams_exist:
         st.warning(f"Only {n_players} player(s) registered. Head to **Players** and add at least 4.")
     elif n_players % 2 != 0:
         st.warning(
-            f"{n_players} players registered — need an **even** number for 2v2. "
+            f"{n_players} players registered \u2014 need an **even** number for 2v2. "
             "Head to **Players** to add one more."
         )
     else:
-        # Preview the pairing before confirming
-        sorted_p = (
-            players_df
-            .sort_values("skill_rating", ascending=False)
-            .reset_index(drop=True)
-        )
-        n = len(sorted_p)
+        # ------------------------------------------------------------------
+        # Initialise / validate the working pairing in session state.
+        # Reset whenever the player roster changes.
+        # ------------------------------------------------------------------
+        _player_id_set = tuple(sorted(players_df["player_id"].astype(int).tolist()))
+        if (
+            "proposed_pairs" not in st.session_state
+            or st.session_state.get("proposed_pairs_players") != _player_id_set
+        ):
+            default = get_default_pairing(players_df)
+            st.session_state["proposed_pairs"]         = [list(p) for p in default]
+            st.session_state["proposed_pairs_players"] = _player_id_set
+
+        pairs = st.session_state["proposed_pairs"]
+        players_map = {int(row["player_id"]): row for _, row in players_df.iterrows()}
+
+        # ------------------------------------------------------------------
+        # Build preview rows with preference indicators
+        # ------------------------------------------------------------------
+        def _pref_label(player_row, partner_row) -> str:
+            pref = str(player_row["partner_pref"] or "").strip()
+            name = str(player_row["name"])
+            if not pref:
+                return name
+            if pref.lower() == str(partner_row["name"]).lower():
+                return f"{name} \U0001f7e2"  # 🟢
+            return f"{name} \U0001f7e1"      # 🟡
+
         preview_rows = []
-        for i in range(n // 2):
-            p1 = sorted_p.iloc[i]
-            p2 = sorted_p.iloc[n - 1 - i]
+        for i, (pid1, pid2) in enumerate(pairs):
+            p1, p2 = players_map[pid1], players_map[pid2]
             avg = round((float(p1["skill_rating"]) + float(p2["skill_rating"])) / 2, 2)
             preview_rows.append({
-                "Team":        f"Team {chr(65 + i)}",
-                "Player 1":    p1["name"],
-                "Skill 1":     p1["skill_rating"],
-                "Player 2":    p2["name"],
-                "Skill 2":     p2["skill_rating"],
-                "Avg Skill":   avg,
+                "Team":      f"Team {chr(65 + i)}",
+                "Player 1":  _pref_label(p1, p2),
+                "Skill 1":   p1["skill_rating"],
+                "Player 2":  _pref_label(p2, p1),
+                "Skill 2":   p2["skill_rating"],
+                "Avg Skill": avg,
             })
 
-        import pandas as pd
         preview_df = pd.DataFrame(preview_rows)
-        st.markdown("**Preview — balanced pairings:**")
-        render_df(
-            grad_style(preview_df.style, (["Avg Skill"], "skill", 1, 10)),
+        hdr_col, legend_col = st.columns([3, 1])
+        with hdr_col:
+            st.markdown("**Proposed pairings:**")
+        with legend_col:
+            st.caption("\U0001f7e2 pref met \u00b7 \U0001f7e1 pref not met")
+        render_df(grad_style(preview_df.style, (["Avg Skill"], "skill", 1, 10)))
+
+        spread    = round(preview_df["Avg Skill"].max() - preview_df["Avg Skill"].min(), 2)
+        prefs_met = sum(
+            1 for r in preview_rows
+            if "\U0001f7e2" in r["Player 1"] or "\U0001f7e2" in r["Player 2"]
         )
+        st.caption(f"Skill spread: **{spread}** pts \u00b7 **{prefs_met}** preference(s) satisfied")
 
-        skill_spread = round(preview_df["Avg Skill"].max() - preview_df["Avg Skill"].min(), 2)
-        st.caption(f"Average skill spread across all teams: **{skill_spread}** points")
+        # ------------------------------------------------------------------
+        # Manual swap UI
+        # ------------------------------------------------------------------
+        with st.expander("\u21c4 Adjust Pairings", expanded=True):
+            st.caption(
+                "Swap any two players between teams to accommodate preferences. "
+                "Avg skills update instantly."
+            )
+            all_names   = [str(row["name"]) for _, row in players_df.iterrows()]
+            name_to_pid = {str(row["name"]): int(row["player_id"]) for _, row in players_df.iterrows()}
 
+            sc1, sc2, sc3 = st.columns([2, 2, 1])
+            with sc1:
+                swap_a = st.selectbox("Player A", options=all_names, key="swap_sel_a")
+            with sc2:
+                swap_b = st.selectbox("Player B", options=all_names, key="swap_sel_b")
+            with sc3:
+                st.write("")
+                do_swap = st.button("\u21c4 Swap", use_container_width=True)
+
+            if do_swap:
+                pid_a = name_to_pid[swap_a]
+                pid_b = name_to_pid[swap_b]
+                if pid_a == pid_b:
+                    st.warning("Select two **different** players to swap.")
+                else:
+                    idx_a = next((i for i, p in enumerate(pairs) if pid_a in p), None)
+                    idx_b = next((i for i, p in enumerate(pairs) if pid_b in p), None)
+                    if idx_a is None or idx_b is None:
+                        st.warning("Player not found in any pairing \u2014 try resetting.")
+                    elif idx_a == idx_b:
+                        st.info("Those players are already on the same team.")
+                    else:
+                        new_pairs = [list(p) for p in pairs]
+                        pos_a = new_pairs[idx_a].index(pid_a)
+                        pos_b = new_pairs[idx_b].index(pid_b)
+                        new_pairs[idx_a][pos_a] = pid_b
+                        new_pairs[idx_b][pos_b] = pid_a
+                        st.session_state["proposed_pairs"] = new_pairs
+                        st.rerun()
+
+            if st.button("\u21ba Reset to balanced", use_container_width=True):
+                st.session_state.pop("proposed_pairs", None)
+                st.session_state.pop("proposed_pairs_players", None)
+                st.rerun()
+
+        # ------------------------------------------------------------------
+        # Confirm & Build
+        # ------------------------------------------------------------------
         if auth.is_admin():
-            if st.button("✅ Confirm & Build Teams", type="primary", width='stretch'):
+            if st.button("\u2705 Confirm & Build Teams", type="primary", width='stretch'):
                 try:
-                    build_balanced_teams()
-                    st.success(f"Built **{n // 2} balanced teams** successfully!")
+                    build_balanced_teams(custom_pairing=[(p[0], p[1]) for p in pairs])
+                    st.success(f"Built **{len(pairs)} balanced teams** successfully!")
+                    st.session_state.pop("proposed_pairs", None)
+                    st.session_state.pop("proposed_pairs_players", None)
                     st.rerun()
                 except (RuntimeError, ValueError) as e:
                     st.error(str(e))

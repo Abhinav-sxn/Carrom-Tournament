@@ -14,11 +14,32 @@ from modules.excel_sync import load_sheet, save_sheet, get_next_id
 from modules.player_manager import update_player_team
 
 
-def build_balanced_teams() -> pd.DataFrame:
+def get_default_pairing(players_df: pd.DataFrame) -> list:
+    """Return the default balanced pairing as a list of (player_id_1, player_id_2) tuples.
+
+    Uses the sorted-interleaving algorithm: sort by skill descending,
+    then pair rank-1 with rank-N, rank-2 with rank-(N-1), etc.
+    """
+    sorted_p = (
+        players_df
+        .sort_values("skill_rating", ascending=False)
+        .reset_index(drop=True)
+    )
+    n = len(sorted_p)
+    return [
+        (int(sorted_p.iloc[i]["player_id"]), int(sorted_p.iloc[n - 1 - i]["player_id"]))
+        for i in range(n // 2)
+    ]
+
+
+def build_balanced_teams(custom_pairing: list | None = None) -> pd.DataFrame:
     """
     Read players from the Players sheet, run the pairing algorithm,
     create Team records, assign player team_ids, and save both sheets.
     Returns the Teams DataFrame.
+
+    Pass *custom_pairing* as a list of (player_id_1, player_id_2) tuples to
+    override the default balanced algorithm (e.g. after manual swaps in the UI).
 
     Raises:
         RuntimeError  if teams already exist, or player count < 4, or player
@@ -39,40 +60,40 @@ def build_balanced_teams() -> pd.DataFrame:
             f"Currently {len(players_df)} players registered."
         )
 
-    # Sort descending by skill
-    sorted_players = (
-        players_df
-        .sort_values("skill_rating", ascending=False)
-        .reset_index(drop=True)
-    )
+    players_map = {int(row["player_id"]): row for _, row in players_df.iterrows()}
 
-    n = len(sorted_players)
+    if custom_pairing is not None:
+        pairing = [(int(a), int(b)) for a, b in custom_pairing]
+        all_ids = set(players_map.keys())
+        for pid1, pid2 in pairing:
+            if pid1 not in all_ids or pid2 not in all_ids:
+                raise ValueError("Custom pairing references an unknown player ID.")
+    else:
+        pairing = get_default_pairing(players_df)
+
     teams = []
-    for i in range(n // 2):
-        p1 = sorted_players.iloc[i]
-        p2 = sorted_players.iloc[n - 1 - i]
+    for i, (pid1, pid2) in enumerate(pairing):
+        p1 = players_map[pid1]
+        p2 = players_map[pid2]
         avg = round((float(p1["skill_rating"]) + float(p2["skill_rating"])) / 2, 2)
         team_id = get_next_id("Teams", "team_id") + i
         teams.append({
-            "team_id":      team_id,
-            "team_name":    f"Team {_num_to_letter(i)}",
-            "avg_skill":    avg,
-            "wins":         0,
-            "losses":       0,
+            "team_id":       team_id,
+            "team_name":     f"Team {_num_to_letter(i)}",
+            "avg_skill":     avg,
+            "wins":          0,
+            "losses":        0,
             "is_eliminated": False,
         })
 
     teams_df = pd.DataFrame(teams)
     save_sheet("Teams", teams_df)
 
-    # Assign team_ids back to players (without triggering update_derived_sheets
-    # each iteration — bulk update instead)
+    # Assign team_ids back to players (bulk update)
     players_copy = players_df.copy()
-    for idx, team in enumerate(teams):
-        p1_id = int(sorted_players.iloc[idx]["player_id"])
-        p2_id = int(sorted_players.iloc[n - 1 - idx]["player_id"])
-        players_copy.loc[players_copy["player_id"] == p1_id, "team_id"] = team["team_id"]
-        players_copy.loc[players_copy["player_id"] == p2_id, "team_id"] = team["team_id"]
+    for team, (pid1, pid2) in zip(teams, pairing):
+        players_copy.loc[players_copy["player_id"] == pid1, "team_id"] = team["team_id"]
+        players_copy.loc[players_copy["player_id"] == pid2, "team_id"] = team["team_id"]
 
     save_sheet("Players", players_copy)
     return teams_df

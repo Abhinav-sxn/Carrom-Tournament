@@ -52,11 +52,18 @@ else:
                     value=5.0, step=0.5,
                     help="1 = Beginner · 10 = Expert",
                 )
+            pref_options = ["— No preference —"] + sorted(players_df["name"].tolist())
+            pref_sel = st.selectbox(
+                "Partner Preference (optional)",
+                options=pref_options,
+                help="Who this player would like to be paired with.",
+            )
             submitted = st.form_submit_button("➕ Add Player", width='stretch')
 
         if submitted:
             try:
-                pid = add_player(name, skill)
+                partner_pref = "" if pref_sel == "— No preference —" else pref_sel
+                pid = add_player(name, skill, partner_pref=partner_pref)
                 st.success(f'Player **{name.strip()}** added (ID {pid}, skill {skill}).')
                 players_df = load_sheet("Players")
             except (ValueError, RuntimeError) as e:
@@ -76,8 +83,9 @@ if players_df.empty:
     st.info("No players yet. Add your first player above.")
 else:
     # Display with formatted columns
-    display = players_df[["player_id", "name", "skill_rating", "team_id"]].copy()
-    display.columns = ["ID", "Name", "Skill Rating", "Team ID"]
+    display = players_df[["player_id", "name", "skill_rating", "partner_pref", "team_id"]].copy()
+    display.columns = ["ID", "Name", "Skill Rating", "Pref Partner", "Team ID"]
+    display["Pref Partner"] = display["Pref Partner"].fillna("—").replace("", "—")
     display["Team ID"] = display["Team ID"].apply(
         lambda x: "—" if (x is None or str(x) == "nan") else int(x)
     )

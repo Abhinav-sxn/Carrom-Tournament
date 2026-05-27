@@ -65,7 +65,7 @@ AWARDS = [
 ]
 
 SHEET_HEADERS = {
-    "Players": ["player_id", "name", "skill_rating", "team_id"],
+    "Players": ["player_id", "name", "skill_rating", "team_id", "partner_pref"],
     "Teams": [
         "team_id", "team_name", "avg_skill",
         "wins", "losses", "is_eliminated",
@@ -221,7 +221,13 @@ def _load_csv_from_path(path: str, sheet_name: str) -> pd.DataFrame:
     expected_cols = SHEET_HEADERS.get(sheet_name, [])
     try:
         df = pd.read_csv(path)
-        return df if not df.empty else pd.DataFrame(columns=expected_cols)
+        if df.empty:
+            return pd.DataFrame(columns=expected_cols)
+        # Backfill any columns added to SHEET_HEADERS after this CSV was saved
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = None
+        return df
     except Exception:
         return pd.DataFrame(columns=expected_cols)
 
