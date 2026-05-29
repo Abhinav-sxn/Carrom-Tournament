@@ -166,21 +166,20 @@ def rename_team(team_id: int, new_name: str) -> None:
 
 def reset_teams() -> None:
     """
-    Wipe all teams and clear player team assignments.
-    Only allowed before any matches have been scheduled.
+    Wipe all match data, then wipe all teams and clear player team assignments.
+    Cascades automatically: schedule + match stats are cleared first so the
+    dataset is always left in a consistent state.
     """
-    matches_df = load_sheet("Matches")
-    if not matches_df.empty:
-        raise RuntimeError(
-            "Cannot reset teams after matches have been scheduled."
-        )
+    # 1. Reset schedule first (safe even when Matches is already empty)
+    from modules.match_scheduler import reset_schedule
+    reset_schedule()
 
-    # Clear Teams sheet
+    # 2. Clear Teams sheet
     save_sheet("Teams", pd.DataFrame(columns=[
         "team_id", "team_name", "avg_skill", "wins", "losses", "is_eliminated"
     ]))
 
-    # Clear team_id on all players
+    # 3. Clear team_id on all players
     players_df = load_sheet("Players")
     if not players_df.empty:
         players_df["team_id"] = None

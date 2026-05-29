@@ -208,21 +208,26 @@ else:
     st.markdown("---")
 
     # ---------------------------------------------------------------------------
-    # Reset (only before matches are scheduled)
+    # Reset — always visible; cascades to wipe schedule too
     # ---------------------------------------------------------------------------
-    if not matches_exist:
-        with st.expander("⚠️ Reset Teams"):
+    with st.expander("⚠️ Reset Teams"):
+        if matches_exist:
+            st.warning(
+                "A schedule has been generated. **Resetting teams will also delete "
+                "all match records and award data.** Player registrations are kept."
+            )
+        else:
             st.warning("This will wipe all teams and clear player assignments. Player list is kept.")
-            if auth.is_admin():
-                if st.button("🔄 Reset Teams", type="secondary"):
-                    try:
-                        reset_teams()
-                        st.success("Teams reset. Head to Players to adjust the list, then rebuild.")
-                        st.rerun()
-                    except RuntimeError as e:
-                        st.error(str(e))
-            else:
-                st.caption("Unlock admin to reset teams.")
-    else:
-        st.info("Matches are scheduled — teams are locked. Go to **Schedule** to manage matches.")
+        if auth.is_admin():
+            if st.button("🔄 Reset Teams" + (" & Schedule" if matches_exist else ""), type="secondary"):
+                try:
+                    reset_teams()
+                    st.success("Teams (and schedule) reset. Head to Players to adjust the list, then rebuild.")
+                    st.session_state.pop("proposed_pairs", None)
+                    st.session_state.pop("proposed_pairs_players", None)
+                    st.rerun()
+                except RuntimeError as e:
+                    st.error(str(e))
+        else:
+            st.caption("Unlock admin to reset teams.")
 
