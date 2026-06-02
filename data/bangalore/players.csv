@@ -1,9 +1,17 @@
 player_id,name,skill_rating,team_id,partner_pref
-1,Kiran K Gajendragadkar,6.0,1.0,
-2,Naveen Kalaivanan,6.0,3.0,
-3,Manoj Srinivas,6.0,4.0,
-5,Harish Patnaik,6.0,4.0,
-6,RaviTeja Mellamputi,6.0,2.0,
-7,Jilan B Pulimaddela,6.0,3.0,
-8,Abhinav Saxena,6.0,2.0,RaviTeja Mellamputi
-9,Sudeep Banerjee,6.0,1.0,Kiran K Gajendragadkar
+1,Kiran K Gajendragadkar,6.0,,
+2,Naveen Kalaivanan,6.0,,
+3,Manoj Srinivas,6.0,,
+5,Harish Patnaik,6.0,,
+6,RaviTeja Mellamputi,6.0,,
+7,Jilan B Pulimaddela,6.0,,
+8,Abhinav Saxena,6.0,,RaviTeja Mellamputi
+9,Sudeep Banerjee,6.0,,Kiran K Gajendragadkar
+10,Prabhakar Gupta,3.0,,
+11,Vijaykumar Laxmappa Batavvanavar,5.0,,
+12,Syed Imran,7.0,,
+13,Arun Kumar V,4.0,,
+14,Pradeep H Sreenath,5.0,,
+15,Shewag Bhattarai,7.0,,
+16,Mohammed Althaf H,4.0,,
+17,Boopathi Sivalingam,7.0,,
