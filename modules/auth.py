@@ -57,14 +57,14 @@ def admin_widget() -> None:
             st.rerun()
         return
 
-    # Use a form so the password value is submitted atomically on one click.
-    with st.sidebar.form("admin_form", clear_on_submit=True):
-        pw = st.text_input("Admin password", type="password")
-        submitted = st.form_submit_button("Unlock admin")
-
-    if submitted:
+    # Use a standalone text input + button so Streamlit does not show the
+    # "Press Enter to submit form" tooltip when focusing the password field.
+    pw = st.sidebar.text_input("Admin password", type="password", key="admin_pw_input")
+    if st.sidebar.button("Unlock admin", key="admin_unlock"):
         if _check_password(pw):
             st.session_state["is_admin"] = True
+            # Clear the stored password field and rerun to refresh UI
+            st.session_state["admin_pw_input"] = ""
             st.rerun()
         else:
             st.sidebar.error("Invalid password")
