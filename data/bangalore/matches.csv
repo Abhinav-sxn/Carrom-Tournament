@@ -1,1 +1,6 @@
 match_id,round,team_a_id,team_b_id,winner_id,loser_id,bracket,status,scheduled_date,date_played,team_a_score,team_b_score
+1,1,7,1,,,winners,scheduled,,,,
+2,1,4,5,,,winners,scheduled,,,,
+3,1,2,3,,,winners,scheduled,,,,
+4,1,6,10,,,winners,scheduled,,,,
+5,1,8,9,,,winners,scheduled,,,,
