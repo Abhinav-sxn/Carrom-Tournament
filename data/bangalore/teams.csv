@@ -1,1 +1,11 @@
 team_id,team_name,avg_skill,wins,losses,is_eliminated
+1,Team A,6.0,0,0,False
+2,Team B,4.5,0,0,False
+3,Team C,5.0,0,0,False
+4,Team D,5.0,0,0,False
+5,Team E,5.0,0,0,False
+6,Team F,5.0,0,0,False
+7,Team G,5.0,0,0,False
+8,Team H,5.5,0,0,False
+9,Team I,5.5,0,0,False
+10,Team J,6.0,0,0,False
