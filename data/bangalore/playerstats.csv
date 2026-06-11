@@ -1,21 +1,21 @@
 player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_king,total_awards
-1,Kiran K Gajendragadkar,Unassigned,0,0,0,0,0
-2,Naveen Kalaivanan,Unassigned,0,0,0,0,0
-3,Manoj Srinivas,Unassigned,0,0,0,0,0
-5,Harish Patnaik,Unassigned,0,0,0,0,0
-6,RaviTeja Mellamputi,Unassigned,0,0,0,0,0
-7,Jilan B Pulimaddela,Unassigned,0,0,0,0,0
-9,Sudeep Banerjee,Unassigned,0,0,0,0,0
-10,Prabhakar Gupta,Unassigned,0,0,0,0,0
-11,Vijaykumar Laxmappa Batavvanavar,Unassigned,0,0,0,0,0
-12,Syed Imran,Unassigned,0,0,0,0,0
-13,Arun Kumar V,Unassigned,0,0,0,0,0
-14,Pradeep H Sreenath,Unassigned,0,0,0,0,0
-15,Shewag Bhattarai,Unassigned,0,0,0,0,0
-16,Mohammed Althaf H,Unassigned,0,0,0,0,0
-17,Boopathi Sivalingam,Unassigned,0,0,0,0,0
-18,Arnab Mondal,Unassigned,0,0,0,0,0
-19,Yogesh Mansingh,Unassigned,0,0,0,0,0
-20,Harsh Sonkar,Unassigned,0,0,0,0,0
-21,Vamsy Madugundu,Unassigned,0,0,0,0,0
-22,Ramesh Singh,Unassigned,0,0,0,0,0
+1,Kiran K Gajendragadkar,Team A,0,0,1,0,1
+2,Naveen Kalaivanan,Team F,0,0,0,0,0
+3,Manoj Srinivas,Team G,0,0,0,0,0
+5,Harish Patnaik,Team H,0,0,0,0,0
+6,RaviTeja Mellamputi,Team I,0,0,0,0,0
+7,Jilan B Pulimaddela,Team J,1,0,0,0,1
+9,Sudeep Banerjee,Team A,0,0,0,1,1
+10,Prabhakar Gupta,Team E,0,0,0,0,0
+11,Vijaykumar Laxmappa Batavvanavar,Team I,0,0,0,0,0
+12,Syed Imran,Team B,0,0,0,0,0
+13,Arun Kumar V,Team G,0,0,0,0,0
+14,Pradeep H Sreenath,Team H,0,0,0,0,0
+15,Shewag Bhattarai,Team C,0,0,0,0,0
+16,Mohammed Althaf H,Team F,0,0,0,0,0
+17,Boopathi Sivalingam,Team D,0,0,0,0,0
+18,Arnab Mondal,Team J,0,1,0,0,1
+19,Yogesh Mansingh,Team D,0,0,0,0,0
+20,Harsh Sonkar,Team B,0,0,0,0,0
+21,Vamsy Madugundu,Team E,0,0,0,0,0
+22,Ramesh Singh,Team C,0,0,0,0,0
