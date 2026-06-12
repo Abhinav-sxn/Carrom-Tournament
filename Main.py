@@ -14,7 +14,6 @@ import pandas as pd
 import streamlit as st
 from modules.excel_sync import init_workbook, load_sheet
 from modules.ui_helpers import render_logo, render_df, date_badge
-from modules.team_builder import get_team_players
 from modules import auth
 
 # ---------------------------------------------------------------------------
@@ -167,19 +166,6 @@ def _home():
             )
             display.index += 1
             render_df(display, hide_index=False)
-
-            # Also show team member lists beneath the standings table
-            st.markdown("---")
-            st.markdown("**Team Members**")
-            for _, t in teams_df.iterrows():
-                tid = int(t["team_id"])
-                tname = t["team_name"]
-                members = get_team_players(tid)
-                if members.empty:
-                    member_line = "—"
-                else:
-                    member_line = ", ".join([str(r["name"]).strip() for _, r in members.iterrows()])
-                st.markdown(f"**{tname}**  <br><span style='font-size:0.9rem;color:#9aa0b4'>{member_line}</span>", unsafe_allow_html=True)
         else:
             st.info("No teams yet — head to **Teams** to build balanced pairs.")
 
