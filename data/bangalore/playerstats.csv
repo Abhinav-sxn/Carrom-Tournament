@@ -1,21 +1,21 @@
 player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_king,total_awards
-1,Kiran K Gajendragadkar,Team A,0,0,0,0,0
-2,Naveen Kalaivanan,Team F,0,0,0,0,0
-3,Manoj Srinivas,Team G,0,0,0,0,0
-5,Harish Patnaik,Team H,0,0,0,0,0
-6,RaviTeja Mellamputi,Team I,0,0,0,0,0
-7,Jilan B Pulimaddela,Hello World,0,0,0,0,0
-9,Sudeep Banerjee,Team A,0,0,0,0,0
-10,Prabhakar Gupta,Team E,0,0,0,0,0
-11,Vijaykumar Laxmappa Batavvanavar,Team I,0,0,0,0,0
-12,Syed Imran,Team B,0,0,0,0,0
-13,Arun Kumar V,Team G,0,0,0,0,0
-14,Pradeep H Sreenath,Team H,0,0,0,0,0
-15,Shewag Bhattarai,Team C,0,0,0,0,0
-16,Mohammed Althaf H,Team F,0,0,0,0,0
-17,Boopathi Sivalingam,Team D,0,0,0,0,0
-18,Arnab Mondal,Hello World,0,0,0,0,0
-19,Yogesh Mansingh,Team D,0,0,0,0,0
-20,Harsh Sonkar,Team B,0,0,0,0,0
-21,Vamsy Madugundu,Team E,0,0,0,0,0
-22,Ramesh Singh,Team C,0,0,0,0,0
+1,Kiran K Gajendragadkar,Kiran & Sudeep,0,0,0,0,0
+2,Naveen Kalaivanan,Naveen & Althaf,0,0,0,0,0
+3,Manoj Srinivas,Manoj & Arun,0,0,0,0,0
+5,Harish Patnaik,Harish & Pradeep,0,0,0,0,0
+6,RaviTeja Mellamputi,RaviTeja & Vijaykumar,0,0,0,0,0
+7,Jilan B Pulimaddela,Team J,0,0,0,0,0
+9,Sudeep Banerjee,Kiran & Sudeep,0,0,0,0,0
+10,Prabhakar Gupta,Prabhakar & Vamsy,0,0,0,0,0
+11,Vijaykumar Laxmappa Batavvanavar,RaviTeja & Vijaykumar,0,0,0,0,0
+12,Syed Imran,Syed & Harsh,0,0,0,0,0
+13,Arun Kumar V,Manoj & Arun,0,0,0,0,0
+14,Pradeep H Sreenath,Harish & Pradeep,0,0,0,0,0
+15,Shewag Bhattarai,Shewag & Ramesh,0,0,0,0,0
+16,Mohammed Althaf H,Naveen & Althaf,0,0,0,0,0
+17,Boopathi Sivalingam,Boopathi & Yogesh,0,0,0,0,0
+18,Arnab Mondal,Team J,0,0,0,0,0
+19,Yogesh Mansingh,Boopathi & Yogesh,0,0,0,0,0
+20,Harsh Sonkar,Syed & Harsh,0,0,0,0,0
+21,Vamsy Madugundu,Prabhakar & Vamsy,0,0,0,0,0
+22,Ramesh Singh,Shewag & Ramesh,0,0,0,0,0
