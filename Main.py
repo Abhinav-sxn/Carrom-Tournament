@@ -132,12 +132,13 @@ def _home():
                 sched = um.get("scheduled_date", None)
                 badge = date_badge(sched)
                 with st.container(border=True):
-                    badge_html = f" {badge}" if badge != "—" else ""
                     st.markdown(
-                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}{badge_html}  \n"
+                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
                         f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
                         unsafe_allow_html=True,
                     )
+                    if badge != "—":
+                        st.markdown(badge, unsafe_allow_html=True)
 
     st.markdown("---")
 
