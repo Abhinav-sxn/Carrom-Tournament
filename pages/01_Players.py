@@ -116,7 +116,7 @@ else:
     if not auth.is_admin():
         st.info("Unlock admin to edit or remove players.")
 
-    for _, row in players_df.iterrows():
+        for _, row in players_df.iterrows():
             pid = int(row["player_id"])
             pname = str(row["name"]).strip()
             raw_skill = row.get("skill_rating", None)
@@ -128,6 +128,11 @@ else:
                 except Exception:
                     pskill = raw_skill
             ppref = row.get("partner_pref", "") or "—"
+
+            # Ensure session_state keys exist so widget callbacks are allowed to write them.
+            for _k in (f"edit_name_only_{pid}", f"confirm_delete_{pid}", f"edit_player_{pid}"):
+                if _k not in st.session_state:
+                    st.session_state[_k] = False
 
             col_main, col_del, col_edit = st.columns([6, 1, 1])
             with col_main:
