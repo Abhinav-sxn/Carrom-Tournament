@@ -136,16 +136,23 @@ else:
             if auth.is_admin():
                 if teams_locked:
                     # When teams are locked, allow editing the player's name only
-                    if col_edit.button("Edit Name", key=f"edit_name_only_{pid}", help=f"Edit name for {pname}"):
+                    def _start_edit_name(pid=pid):
                         st.session_state[f"edit_name_only_{pid}"] = True
+
+                    col_edit.button("Edit Name", key=f"edit_name_only_{pid}", help=f"Edit name for {pname}", on_click=_start_edit_name)
                 else:
                     # Delete (cross) button
-                    if col_del.button("✖", key=f"del_{pid}", help=f"Remove {pname}"):
+                    def _confirm_delete(pid=pid):
                         st.session_state[f"confirm_delete_{pid}"] = True
 
+                    # Delete (cross) button
+                    col_del.button("✖", key=f"del_{pid}", help=f"Remove {pname}", on_click=_confirm_delete)
+
                     # Edit (pencil) button (full edit)
-                    if col_edit.button("✎", key=f"edit_{pid}", help=f"Edit {pname}"):
+                    def _start_full_edit(pid=pid):
                         st.session_state[f"edit_player_{pid}"] = True
+
+                    col_edit.button("✎", key=f"edit_{pid}", help=f"Edit {pname}", on_click=_start_full_edit)
 
             # Confirmation UI
             if st.session_state.get(f"confirm_delete_{pid}", False):
