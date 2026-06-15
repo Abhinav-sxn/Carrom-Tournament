@@ -213,6 +213,10 @@ def get_team_label_firstnames(team_id: int) -> str:
         return name_map.get(team_id, f"Team {team_id}")
     first_names = []
     for _, r in players.iterrows():
+        pref = str(r.get("preferred_first_name") or "").strip()
+        if pref:
+            first_names.append(pref)
+            continue
         full = str(r.get("name") or "").strip()
         if not full:
             continue

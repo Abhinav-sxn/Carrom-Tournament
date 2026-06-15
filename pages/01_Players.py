@@ -45,6 +45,7 @@ else:
             col1, col2 = st.columns([2, 1])
             with col1:
                 name = st.text_input("Player Name", placeholder="e.g. Rahul Sharma", max_chars=60)
+                preferred_first = st.text_input("Preferred First Name (optional)", placeholder="e.g. Rahul", max_chars=30)
             with col2:
                 skill = st.slider(
                     "Skill Rating",
@@ -63,7 +64,7 @@ else:
         if submitted:
             try:
                 partner_pref = "" if pref_sel == "— No preference —" else pref_sel
-                pid = add_player(name, skill, partner_pref=partner_pref)
+                pid = add_player(name, skill, partner_pref=partner_pref, preferred_first_name=preferred_first)
                 st.success(f'Player **{name.strip()}** added (ID {pid}, skill {skill}).')
                 players_df = load_sheet("Players")
             except (ValueError, RuntimeError) as e:
@@ -166,6 +167,9 @@ else:
                         cur_skill = int(float(pskill))
                     except Exception:
                         cur_skill = 5
+                    # Load current preferred first name if present
+                    cur_pref_first = row.get("preferred_first_name", "") or ""
+                    new_pref_first = st.text_input("Preferred First Name (optional)", value=cur_pref_first, key=f"edit_pref_first_{pid}")
                     new_skill = st.slider(
                         "Skill Rating",
                         min_value=1, max_value=10, value=cur_skill, step=1, key=f"edit_skill_{pid}"
@@ -181,7 +185,7 @@ else:
                 if submitted:
                     partner_pref = "" if new_pref_sel == "— No preference —" else new_pref_sel
                     try:
-                        update_player(pid, name=new_name, skill_rating=new_skill, partner_pref=partner_pref)
+                        update_player(pid, name=new_name, skill_rating=new_skill, partner_pref=partner_pref, preferred_first_name=new_pref_first)
                         st.success("Saved changes.")
                         st.session_state[f"edit_player_{pid}"] = False
                         st.experimental_rerun()

@@ -7,7 +7,7 @@ import pandas as pd
 from modules.excel_sync import load_sheet, save_sheet, get_next_id
 
 
-def add_player(name: str, skill_rating: float, partner_pref: str = "") -> int:
+def add_player(name: str, skill_rating: float, partner_pref: str = "", preferred_first_name: str | None = None) -> int:
     """
     Add a new player to the Players sheet.
     Returns the new player_id.
@@ -36,6 +36,7 @@ def add_player(name: str, skill_rating: float, partner_pref: str = "") -> int:
         "skill_rating": sr_int,
         "team_id":      None,
         "partner_pref": partner_pref.strip(),
+        "preferred_first_name": (preferred_first_name.strip() if preferred_first_name else ""),
     }])
     if df.empty:
         df = new_row
@@ -76,7 +77,7 @@ def update_player_team(player_id: int, team_id: int) -> None:
     save_sheet("Players", df)
 
 
-def update_player(player_id: int, name: str | None = None, skill_rating: float | None = None, partner_pref: str | None = None) -> None:
+def update_player(player_id: int, name: str | None = None, skill_rating: float | None = None, partner_pref: str | None = None, preferred_first_name: str | None = None) -> None:
     """
     Update player's attributes. Any argument set to None is left unchanged.
 
@@ -111,5 +112,9 @@ def update_player(player_id: int, name: str | None = None, skill_rating: float |
     # Apply partner preference (allow empty string to clear)
     if partner_pref is not None:
         df.loc[df["player_id"] == player_id, "partner_pref"] = partner_pref.strip()
+
+    # Apply preferred first name (allow empty string to clear)
+    if preferred_first_name is not None:
+        df.loc[df["player_id"] == player_id, "preferred_first_name"] = preferred_first_name.strip()
 
     save_sheet("Players", df)
