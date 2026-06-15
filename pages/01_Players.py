@@ -34,6 +34,7 @@ teams_locked = teams_exist  # once teams are built, player list is locked
 # ---------------------------------------------------------------------------
 if teams_locked:
     st.warning("Teams have been built — player list is locked. Reset teams on the **Teams** page to make changes.")
+    st.info("You can still update each player's *Preferred First Name* to control how teams are labeled in the UI.")
 else:
     # Only render the interactive add-player form for admins. When not
     # authenticated, show a simple informational prompt instead — this avoids
