@@ -96,15 +96,21 @@ def _home():
     c4.metric("Matches Remaining", remaining_matches)
 
     # ---------------------------------------------------------------------------
-    # Upcoming match alert
+    # Upcoming match alert (grouped and numbered by date)
     # ---------------------------------------------------------------------------
     if not matches_df.empty:
         upcoming = matches_df[
             (matches_df["status"] == "scheduled") &
             (matches_df["bracket"].str.lower() != "bye")
-        ].sort_values(["round", "match_id"]).head(5)
+        ].copy()
 
         if not upcoming.empty and not teams_df.empty:
+            # normalize scheduled_date to datetimes for robust sorting (accept day-first formats)
+            upcoming["_sched_dt"] = pd.to_datetime(upcoming.get("scheduled_date", None), dayfirst=True, errors="coerce")
+            upcoming["_sched_date"] = upcoming["_sched_dt"].dt.date
+            # sort by datetime (NaT last) then round/match_id; use stable sort
+            upcoming = upcoming.sort_values(["_sched_dt", "round", "match_id"], na_position="last", kind="mergesort")
+
             name_map = teams_df.set_index("team_id")["team_name"].to_dict()
             def _team_label(tid):
                 if pd.isna(tid):
@@ -125,16 +131,35 @@ def _home():
                 return f"<strong>{tname}</strong>"
 
             st.markdown("##### ⚡ Upcoming Matches")
-            for _, um in upcoming.iterrows():
-                sched = um.get("scheduled_date", None)
-                badge = date_badge(sched)
-                with st.container(border=True):
-                    badge_html = f" {badge}" if badge != "—" else ""
-                    st.markdown(
-                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])}{badge_html}  \n"
-                        f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
-                        unsafe_allow_html=True,
-                    )
+            # Build an explicit list of unique dates in chronological order (NaT last)
+            ordered = upcoming.dropna(subset=["_sched_dt"]).sort_values("_sched_dt")
+            ordered_dates = list(dict.fromkeys(ordered["_sched_dt"].dt.date))
+            if upcoming["_sched_date"].isna().any():
+                ordered_dates = ordered_dates + [None]
+
+            for sched_date in ordered_dates:
+                if pd.notna(sched_date):
+                    group = upcoming[upcoming["_sched_date"] == sched_date]
+                else:
+                    group = upcoming[upcoming["_sched_date"].isna()]
+
+                # display a header for the date (use date_badge to get consistent styling)
+                badge = date_badge(sched_date.isoformat()) if pd.notna(sched_date) else "—"
+                if badge != "—":
+                    st.markdown(f"**{badge}**", unsafe_allow_html=True)
+                else:
+                    st.markdown("**Unscheduled**")
+
+                # enumerate matches for this date (1-based)
+                for idx, (_, um) in enumerate(group.iterrows(), start=1):
+                    with st.container(border=True):
+                        # display per-date index as the match number; include the date for clarity
+                        date_text = sched_date.strftime('%d %b %Y') if pd.notna(sched_date) else "Unscheduled"
+                        st.markdown(
+                            f"**Match {idx}** &nbsp;·&nbsp; Round {int(um['round'])} {date_text}  \n"
+                            f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
+                            unsafe_allow_html=True,
+                        )
 
     st.markdown("---")
 

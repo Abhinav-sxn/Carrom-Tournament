@@ -25,21 +25,16 @@ def date_badge(date_str) -> str:
         return str(date_str)
     today    = date.today()
     tomorrow = today + timedelta(days=1)
-    if d == tomorrow:
-        return (
-            "<span style='background:#16a34a;color:#fff;padding:2px 10px;"
-            "border-radius:999px;font-weight:700;font-size:0.85rem;'>"
-            "🟢 Tomorrow</span>"
-        )
+    base_style = "padding:2px 10px;border-radius:999px;font-weight:700;font-size:0.85rem;"
+    fmt = d.strftime('%d %b %Y')
     if d == today:
-        return (
-            "<span style='background:#d97706;color:#fff;padding:2px 10px;"
-            "border-radius:999px;font-weight:700;font-size:0.85rem;'>"
-            "⚡ Today</span>"
-        )
+        return f"<span style='background:#d97706;color:#fff;{base_style}'>⚡ Today</span>"
+    if d == tomorrow:
+        return f"<span style='background:#16a34a;color:#fff;{base_style}'>🟢 Tomorrow</span>"
     if d < today:
-        return f"<span style='color:#6b7280;font-size:0.85rem;'>{d.strftime('%d %b %Y')}</span>"
-    return f"<span style='font-size:0.85rem;'>{d.strftime('%d %b %Y')}</span>"
+        return f"<span style='background:#374151;color:#9CA3AF;{base_style}'>{fmt}</span>"
+    # future dates: highlight with an accent pill so dates are visible
+    return f"<span style='background:#0ea5e9;color:#fff;{base_style}'>{fmt}</span>"
 
 # ---------------------------------------------------------------------------
 # Colormaps — pure Python, no matplotlib required
