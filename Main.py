@@ -102,7 +102,7 @@ def _home():
         upcoming = matches_df[
             (matches_df["status"] == "scheduled") &
             (matches_df["bracket"].str.lower() != "bye")
-        ].sort_values(["round", "match_id"])
+        ].sort_values(["round", "match_id"]).head(3)
 
         if not upcoming.empty and not teams_df.empty:
             name_map = teams_df.set_index("team_id")["team_name"].to_dict()
@@ -132,13 +132,13 @@ def _home():
                 sched = um.get("scheduled_date", None)
                 badge = date_badge(sched)
                 with st.container(border=True):
-                    # Include the date badge inline so it appears as a pill
-                    badge_html = f" {badge}" if badge != "—" else ""
                     st.markdown(
-                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}{badge_html}  \n"
-                        f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
-                        unsafe_allow_html=True,
+                            f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
+                            f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
+                            unsafe_allow_html=True,
                     )
+                    if badge != "—":
+                        st.markdown(badge, unsafe_allow_html=True)
 
     st.markdown("---")
 
