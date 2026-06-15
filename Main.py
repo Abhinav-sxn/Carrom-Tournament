@@ -14,7 +14,6 @@ import pandas as pd
 import streamlit as st
 from modules.excel_sync import init_workbook, load_sheet
 from modules.ui_helpers import render_logo, render_df, date_badge
-from modules.team_builder import get_team_players
 from modules import auth
 
 # ---------------------------------------------------------------------------
@@ -106,23 +105,9 @@ def _home():
 
         if not upcoming.empty and not teams_df.empty:
             name_map = teams_df.set_index("team_id")["team_name"].to_dict()
-            def _team_label(tid):
-                if pd.isna(tid):
-                    return "—"
-                tname = name_map.get(int(tid), f"Team {int(tid)}")
-                try:
-                    players = get_team_players(int(tid))
-                    firsts = []
-                    for _, p in players.iterrows():
-                        raw = str(p.get("name") or "").strip()
-                        if raw:
-                            firsts.append(raw.split()[0])
-                    if firsts:
-                        names_html = " &amp; ".join(firsts)
-                        return f"<strong>{tname}</strong> <span style=\"font-style:italic;font-size:0.9em\">({names_html})</span>"
-                except Exception:
-                    pass
-                return f"<strong>{tname}</strong>"
+            def _tn(tid):
+                if pd.isna(tid): return "—"
+                return name_map.get(int(tid), f"Team {int(tid)}")
 
             st.markdown("##### ⚡ Upcoming Matches")
             for _, um in upcoming.iterrows():
@@ -133,9 +118,8 @@ def _home():
                 badge = date_badge(sched)
                 with st.container(border=True):
                     st.markdown(
-                            f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
-                            f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
-                            unsafe_allow_html=True,
+                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
+                        f"🎯 &nbsp; **{_tn(um['team_a_id'])}** &nbsp; vs &nbsp; **{_tn(um['team_b_id'])}**"
                     )
                     if badge != "—":
                         st.markdown(badge, unsafe_allow_html=True)
@@ -191,22 +175,14 @@ def _home():
         if not matches_df.empty:
             done = matches_df[matches_df["status"] == "done"].copy()
             if not done.empty and not teams_df.empty:
-                def _label_for_row(tid):
-                    return _team_label(tid)
-
+                name_map = teams_df.set_index("team_id")["team_name"].to_dict()
+                done["Team A"]  = done["team_a_id"].map(name_map)
+                done["Team B"]  = done["team_b_id"].map(name_map)
+                done["Winner"]  = done["winner_id"].map(name_map)
                 done["Bracket"] = done["bracket"].str.capitalize()
-                recent = done[["round", "team_a_id", "team_b_id", "winner_id", "Bracket"]].tail(5)
-                recent.columns = ["Round", "Team A ID", "Team B ID", "Winner ID", "Bracket"]
-                # Render as markdown lines to allow HTML labels
-                for _, r in recent.iterrows():
-                    round_no = int(r["Round"])
-                    ta = _label_for_row(r["Team A ID"]) if pd.notna(r["Team A ID"]) else "—"
-                    tb = _label_for_row(r["Team B ID"]) if pd.notna(r["Team B ID"]) else "—"
-                    winner = _label_for_row(r["Winner ID"]) if pd.notna(r["Winner ID"]) else "—"
-                    st.markdown(
-                        f"**Round {round_no}** — {ta}  vs  {tb}  ·  Winner: {winner}",
-                        unsafe_allow_html=True,
-                    )
+                recent = done[["round", "Team A", "Team B", "Winner", "Bracket"]].tail(5)
+                recent.columns = ["Round", "Team A", "Team B", "Winner", "Bracket"]
+                render_df(recent.reset_index(drop=True))
             else:
                 st.info("No completed matches yet.")
         else:
