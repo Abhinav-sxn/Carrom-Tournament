@@ -126,19 +126,15 @@ def _home():
 
             st.markdown("##### ⚡ Upcoming Matches")
             for _, um in upcoming.iterrows():
-                bracket_label = {"winners": "Winners Bracket", "losers": "Losers Bracket", "finals": "🏆 Finals"}.get(
-                    str(um["bracket"]).lower(), str(um["bracket"]).capitalize()
-                )
                 sched = um.get("scheduled_date", None)
                 badge = date_badge(sched)
                 with st.container(border=True):
+                    badge_html = f" {badge}" if badge != "—" else ""
                     st.markdown(
-                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {bracket_label}  \n"
+                        f"**Match {int(um['match_id'])}** &nbsp;·&nbsp; Round {int(um['round'])}{badge_html}  \n"
                         f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
                         unsafe_allow_html=True,
                     )
-                    if badge != "—":
-                        st.markdown(badge, unsafe_allow_html=True)
 
     st.markdown("---")
 
