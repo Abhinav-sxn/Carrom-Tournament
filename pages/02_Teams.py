@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 from modules.excel_sync import load_sheet
 from modules.team_builder import build_balanced_teams, get_default_pairing, rename_team, reset_teams, get_team_players
-from modules.player_manager import update_player
 from modules.ui_helpers import render_logo, grad_style, render_df
 from modules import auth
 
@@ -197,24 +196,6 @@ else:
                         value=p["name"],
                         delta=f"Skill {int(float(p.get('skill_rating', 0)))}",
                     )
-                    # Show current preferred first name and allow admin to edit it
-                    pref_first = str(p.get("preferred_first_name") or "").strip()
-                    if pref_first:
-                        cols[idx % 2].markdown(f"<div style='font-size:0.9rem;color:#6B7280'>Display: <strong>{pref_first}</strong></div>", unsafe_allow_html=True)
-                    if auth.is_admin():
-                        if cols[idx % 2].button("Display", key=f"team_display_{team_id}_{int(p['player_id'])}"):
-                            st.session_state[f"team_edit_display_{team_id}_{int(p['player_id'])}"] = True
-                    if st.session_state.get(f"team_edit_display_{team_id}_{int(p['player_id'])}", False):
-                        with st.form(f"team_edit_display_form_{team_id}_{int(p['player_id'])}"):
-                            new_display = st.text_input("Preferred First Name", value=pref_first, key=f"team_pref_first_{team_id}_{int(p['player_id'])}")
-                            if st.form_submit_button("Save"):
-                                try:
-                                    update_player(int(p["player_id"]), preferred_first_name=new_display)
-                                    st.success("Saved display name.")
-                                    st.session_state[f"team_edit_display_{team_id}_{int(p['player_id'])}"] = False
-                                    st.experimental_rerun()
-                                except Exception as e:
-                                    st.error(str(e))
             else:
                 st.caption("No players assigned.")
 
