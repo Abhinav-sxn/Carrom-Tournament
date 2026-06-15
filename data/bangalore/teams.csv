@@ -1,7 +1,7 @@
 team_id,team_name,avg_skill,wins,losses,is_eliminated
 1,Team A,6.0,0,0,False
 2,Team B,4.5,0,0,False
-3,Team C,3.0,0,0,False
+3,Strike Force,3.0,0,0,False
 4,Team D,6.5,0,0,False
 5,Team E,5.0,0,0,False
 6,Team F,5.0,0,0,False
