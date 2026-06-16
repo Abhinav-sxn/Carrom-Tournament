@@ -108,8 +108,16 @@ def _home():
             # normalize scheduled_date to datetimes for robust sorting (accept day-first formats)
             upcoming["_sched_dt"] = pd.to_datetime(upcoming.get("scheduled_date", None), dayfirst=True, errors="coerce")
             upcoming["_sched_date"] = upcoming["_sched_dt"].dt.date
-            # sort by datetime (NaT last) then round/match_id; use stable sort
-            upcoming = upcoming.sort_values(["_sched_dt", "round", "match_id"], na_position="last", kind="mergesort")
+            # create a combined datetime (date + time) when time is provided; leave NaT when time is missing
+            upcoming["_sched_dt_time"] = pd.NaT
+            has_time = upcoming.get("scheduled_time").notna() & (upcoming.get("scheduled_time").astype(str).str.strip() != "")
+            if has_time.any():
+                combined = (upcoming.loc[has_time, "scheduled_date"].astype(str).str.strip()
+                            + " " + upcoming.loc[has_time, "scheduled_time"].astype(str).str.strip())
+                upcoming.loc[has_time, "_sched_dt_time"] = pd.to_datetime(combined, dayfirst=True, errors="coerce")
+
+            # sort by date then time (timed matches first). Use stable sort to preserve deterministic ordering.
+            upcoming = upcoming.sort_values(["_sched_dt", "_sched_dt_time", "round", "match_id"], na_position="last", kind="mergesort")
 
             name_map = teams_df.set_index("team_id")["team_name"].to_dict()
             def _team_label(tid):
@@ -150,7 +158,8 @@ def _home():
                 else:
                     st.markdown("**Unscheduled**")
 
-                # enumerate matches for this date (1-based)
+                # enumerate matches for this date (1-based). Ensure group is sorted by time within the date
+                group = group.sort_values(["_sched_dt_time", "round", "match_id"], na_position="last", kind="mergesort")
                 for idx, (_, um) in enumerate(group.iterrows(), start=1):
                     with st.container(border=True):
                         # display per-date index as the match number; include the date for clarity
