@@ -1,6 +1,6 @@
 team_id,team_name,avg_skill,wins,losses,is_eliminated
 1,Team A - Shri Pachori & Aashish Sharma,4.0,0,0,False
-2,Team B,4.0,0,0,False
+2,Team B - Prateek Kumar & Vivek Sharma,4.0,0,0,False
 3,Team C - Aayush Dubey & Aishwarya Jain,3.5,0,0,False
 4,Team D,3.5,0,0,False
 5,Team E,3.5,0,0,False
