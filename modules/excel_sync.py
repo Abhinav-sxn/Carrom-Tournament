@@ -141,15 +141,24 @@ def _ensure_bg_thread() -> None:
         _bg_thread = t
 
 
-def sync_to_github() -> dict:
-    """Push all dirty sheets to GitHub immediately.
+def sync_to_github(location: str | None = None) -> dict:
+    """Push dirty sheets to GitHub immediately.
 
+    If *location* is provided, only sheets for that location are pushed.
     Safe to call from any thread — does not use st.session_state or st.warning.
     Returns {"pushed": [..."location/sheet"...], "failed": [...]}.
     """
     with _dirty_lock:
         items = list(_dirty_sheets)
-        _dirty_sheets.clear()
+        # If a location was specified we only pop matching items from the
+        # dirty set; leave others queued for the background thread.
+        if location is None:
+            _dirty_sheets.clear()
+        else:
+            # remove only the matching entries
+            for it in list(_dirty_sheets):
+                if it[1] == location:
+                    _dirty_sheets.discard(it)
 
     pushed: list[str] = []
     failed: list[str] = []

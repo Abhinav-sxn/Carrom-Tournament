@@ -438,10 +438,13 @@ def render_logo() -> None:
         pass
 
     # Sync-to-GitHub button (admin only)
-    if auth.is_admin():
-        from modules.excel_sync import sync_to_github
-        if st.sidebar.button("☁️ Sync to GitHub", key="sidebar_sync", width="stretch"):
-            result = sync_to_github()
+        if auth.is_admin():
+            from modules.excel_sync import sync_to_github
+            if st.sidebar.button("☁️ Sync to GitHub", key="sidebar_sync", width="stretch"):
+                # Only sync the currently selected location when the admin
+                # explicitly clicks the sidebar button — background thread
+                # will still push other locations on its schedule.
+                result = sync_to_github(st.session_state.get("_location"))
             if result["pushed"]:
                 st.sidebar.success(f"✅ Synced {len(result['pushed'])} sheet(s) to GitHub")
             elif result["failed"]:
