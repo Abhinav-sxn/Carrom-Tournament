@@ -160,8 +160,20 @@ def sync_to_github() -> dict:
             continue
         try:
             df = pd.read_csv(path)
-            from modules.github_sync import push_file
-            push_file(repo, df.to_csv(index=False), f"Sync {location}/{sheet_name}")
+            # Safety: avoid pushing an empty local sheet that would overwrite a
+            # non-empty remote sheet (this previously caused data loss when
+            # a temporary GitHub pull failed and an empty CSV was created).
+            from modules.github_sync import push_file, pull_file
+            local_csv = df.to_csv(index=False)
+            # If local appears empty (no rows), check remote first. If remote
+            # exists and is non-empty, skip pushing to avoid accidental overwrite.
+            if df.dropna(how="all").empty:
+                remote_content = pull_file(repo)
+                if remote_content is not None and remote_content.strip() != "":
+                    # Skip this push; remote has content but local is empty.
+                    failed.append(f"{location}/{sheet_name} (empty local, remote preserved)")
+                    continue
+            push_file(repo, local_csv, f"Sync {location}/{sheet_name}")
             pushed.append(f"{location}/{sheet_name}")
         except Exception:
             failed.append(f"{location}/{sheet_name}")
