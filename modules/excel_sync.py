@@ -79,7 +79,7 @@ SHEET_HEADERS = {
     ],
     "Matches": [
         "match_id", "round", "team_a_id", "team_b_id",
-        "winner_id", "loser_id", "bracket", "status", "scheduled_date", "date_played",
+        "winner_id", "loser_id", "bracket", "status", "scheduled_date", "scheduled_time", "date_played",
         "team_a_score", "team_b_score",
     ],
     "MatchStats": ["stat_id", "match_id", "player_id", "team_id"] + AWARDS,

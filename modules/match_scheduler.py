@@ -71,6 +71,7 @@ def generate_schedule() -> pd.DataFrame:
             "bracket":    "winners",
             "status":     "bye",
             "scheduled_date": None,
+            "scheduled_time": None,
             "date_played": None,
         })
         # Grant the bye win
@@ -189,6 +190,7 @@ def advance_bracket(completed_match_id: int) -> None:
                 "bracket": "winners",
                 "status": "bye",
                 "scheduled_date": None,
+                "scheduled_time": None,
                 "date_played": None,
                 "team_a_score": None,
                 "team_b_score": None,
@@ -210,6 +212,7 @@ def advance_bracket(completed_match_id: int) -> None:
                 "bracket": "losers",
                 "status": "bye",
                 "scheduled_date": None,
+                "scheduled_time": None,
                 "date_played": None,
                 "team_a_score": None,
                 "team_b_score": None,
@@ -312,7 +315,32 @@ def set_match_scheduled_date(match_id: int, scheduled_date) -> None:
     else:
         val = None
     df["scheduled_date"] = df["scheduled_date"].astype(object)
+    df["scheduled_time"] = df.get("scheduled_time", None).astype(object)
     df.loc[df["match_id"].astype(int) == match_id, "scheduled_date"] = val
+    save_sheet("Matches", df)
+
+
+def set_match_scheduled_time(match_id: int, scheduled_time) -> None:
+    """Set or clear the planned time for a scheduled match.
+
+    *scheduled_time* may be a time object, a string "HH:MM", or None to clear.
+    """
+    df = load_sheet("Matches")
+    if df.empty or match_id not in df["match_id"].astype(int).values:
+        raise ValueError(f"Match ID {match_id} not found.")
+    if scheduled_time is not None:
+        # Normalize to HH:MM string
+        try:
+            st = str(scheduled_time)
+            if hasattr(scheduled_time, "strftime"):
+                st = scheduled_time.strftime("%H:%M")
+        except Exception:
+            st = str(scheduled_time)
+        val = st
+    else:
+        val = None
+    df["scheduled_time"] = df.get("scheduled_time", None).astype(object)
+    df.loc[df["match_id"].astype(int) == match_id, "scheduled_time"] = val
     save_sheet("Matches", df)
 
 
@@ -330,7 +358,7 @@ def reset_schedule() -> None:
 
     save_sheet("Matches", pd.DataFrame(columns=[
         "match_id", "round", "team_a_id", "team_b_id",
-        "winner_id", "loser_id", "bracket", "status", "scheduled_date", "date_played",
+        "winner_id", "loser_id", "bracket", "status", "scheduled_date", "scheduled_time", "date_played",
         "team_a_score", "team_b_score",
     ]))
 
@@ -357,6 +385,7 @@ def _make_match(match_id: int, round_num: int, team_a_id: int,
         "bracket":      bracket,
         "status":       "scheduled",
         "scheduled_date": None,
+        "scheduled_time": None,
         "date_played":  None,
         "team_a_score": None,
         "team_b_score": None,

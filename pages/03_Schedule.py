@@ -5,9 +5,9 @@ View the full match bracket and schedule.
 
 import streamlit as st
 import pandas as pd
-from datetime import date, timedelta
+from datetime import date, timedelta, time
 from modules.excel_sync import load_sheet
-from modules.match_scheduler import generate_schedule, reset_schedule, schedule_finals_by_points, set_match_scheduled_date
+from modules.match_scheduler import generate_schedule, reset_schedule, schedule_finals_by_points, set_match_scheduled_date, set_match_scheduled_time
 from modules.ui_helpers import render_logo, date_badge
 from modules.team_builder import get_team_players
 from modules import auth
@@ -196,8 +196,28 @@ for _, row in display_df.iterrows():
             if new_date != cur_val:
                 set_match_scheduled_date(match_id, new_date)
                 st.rerun()
+            # Time input (admin)
+            cur_time = None
+            raw_t = row.get("scheduled_time", None)
+            if raw_t and str(raw_t) not in ("", "nan", "None"):
+                try:
+                    cur_time = time.fromisoformat(str(raw_t))
+                except Exception:
+                    cur_time = None
+            new_time = col_date.time_input(
+                "⏰ Set time",
+                value=cur_time,
+                key=f"sched_time_{match_id}",
+                label_visibility="collapsed",
+            )
+            if new_time != cur_time:
+                set_match_scheduled_time(match_id, new_time)
+                st.rerun()
         else:
-            col_date.markdown(date_badge(sched_date), unsafe_allow_html=True)
+            # Viewer: show date badge and the scheduled time (or TBD)
+            sched_time = row.get("scheduled_time", None)
+            time_text = sched_time if sched_time and str(sched_time) not in ("", "nan", "None") else "TBD"
+            col_date.markdown(f"{date_badge(sched_date)}  \n**{time_text}**", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Champion banner

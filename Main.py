@@ -155,8 +155,13 @@ def _home():
                     with st.container(border=True):
                         # display per-date index as the match number; include the date for clarity
                         date_text = sched_date.strftime('%d %b %Y') if pd.notna(sched_date) else "Unscheduled"
+                        sched_time = um.get("scheduled_time", None)
+                        if sched_time and str(sched_time) not in ("", "nan", "None"):
+                            time_part = f"@ {str(sched_time)}"
+                        else:
+                            time_part = "· TBD"
                         st.markdown(
-                            f"**Match {idx}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {date_text}  \n"
+                            f"**Match {idx}** &nbsp;·&nbsp; Round {int(um['round'])} &nbsp;·&nbsp; {date_text} &nbsp;{time_part}  \n"
                             f"🎯 &nbsp; {_team_label(um['team_a_id'])} &nbsp; vs &nbsp; {_team_label(um['team_b_id'])}",
                             unsafe_allow_html=True,
                         )
