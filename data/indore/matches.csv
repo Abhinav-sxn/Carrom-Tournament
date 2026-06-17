@@ -1,5 +1,5 @@
 match_id,round,team_a_id,team_b_id,winner_id,loser_id,bracket,status,scheduled_date,scheduled_time,date_played,team_a_score,team_b_score
-1,1,7,4,,,winners,scheduled,2026-06-17,02:00,,,
+1,1,7,4,,,winners,scheduled,2026-06-17,07:30,,,
 2,1,6,9,,,winners,scheduled,2026-06-18,04:30,,,
 3,1,2,5,,,winners,scheduled,2026-06-18,02:00,,,
 4,1,8,1,,,winners,scheduled,2026-06-18,02:30,,,

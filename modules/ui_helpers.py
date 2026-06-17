@@ -458,30 +458,6 @@ def render_logo() -> None:
         auth.admin_widget()
     except Exception:
         pass
-
-    # Admin actions (cache clear)
-    if auth.is_admin():
-
-        # Clear Streamlit caches + non-essential session state keys
-        def _clear_app_cache():
-            try:
-                st.cache_data.clear()
-            except Exception:
-                pass
-            try:
-                st.cache_resource.clear()
-            except Exception:
-                pass
-            # Preserve location selector and admin login state
-            preserve = {"_location", "_loc_select", "is_admin"}
-            for k in list(st.session_state.keys()):
-                if k not in preserve:
-                    st.session_state.pop(k, None)
-            st.experimental_rerun()
-
-        if st.sidebar.button("♻️ Clear cache & session", key="sidebar_clear_cache", width="stretch"):
-            _clear_app_cache()
-
     # Logo
     logo_file = None
     if _LOGO_DIR.exists():

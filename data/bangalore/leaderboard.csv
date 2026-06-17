@@ -1,1 +1,11 @@
 rank,team_id,team_name,wins,losses,status,total_points,total_awards
+1,1,Team A,0,0,Active,0,0
+2,2,Team B,0,0,Active,0,0
+3,3,Skill Force,0,0,Active,0,0
+4,4,Team D,0,0,Active,0,0
+5,5,Team E,0,0,Active,0,0
+6,6,Team F,0,0,Active,0,0
+7,7,Team G,0,0,Active,0,0
+8,8,Team H,0,0,Active,0,0
+9,9,Avengers,0,0,Active,0,0
+10,10,Team J,0,0,Active,0,0
