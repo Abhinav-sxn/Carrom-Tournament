@@ -149,6 +149,10 @@ hr {{
     padding: 1.2rem 1.5rem !important;
     box-shadow: 0 4px 10px {shadow} !important;
     transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    min-height: 140px; /* Uniform height for metric boxes */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }}
 [data-testid="metric-container"]:hover,
 [data-testid="stMetricContainer"]:hover {{
