@@ -230,6 +230,10 @@ def _load_from_supabase(sheet_name: str, location: str) -> pd.DataFrame | None:
         if not data:
             return pd.DataFrame(columns=expected_cols)
         df = pd.DataFrame(data)
+        # Drop the auto-generated serial 'id' column Supabase adds — it is not
+        # part of our schema and causes primary-key conflicts when re-inserted.
+        if "id" in df.columns:
+            df = df.drop(columns=["id"])
         if "location" in df.columns:
             df = df.drop(columns=["location"])
         # Backfill any columns added to SHEET_HEADERS
@@ -302,6 +306,9 @@ def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
             records = df.to_dict(orient="records")
             for r in records:
                 r["location"] = loc
+                # Remove the auto-generated serial 'id' column that Supabase adds.
+                # If included on INSERT it causes primary-key conflicts and silent failures.
+                r.pop("id", None)
                 for k, v in list(r.items()):
                     if pd.isna(v):
                         r[k] = None
