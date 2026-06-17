@@ -18,13 +18,17 @@ st.markdown("---")
 @st.fragment(run_every=5)
 def render_leaderboard():
     # ---------------------------------------------------------------------------
-    # Load data in parallel — pass location explicitly so the auto-refresh
-    # thread always uses the user's selected location, not the thread default.
+    # Sync active location for this fragment execution thread
     # ---------------------------------------------------------------------------
-    from modules.excel_sync import load_sheets, set_location
-    loc = st.session_state.get("_location", "Bangalore")
-    set_location(loc)  # ensure this thread's _tls has the right location
-    sheets = load_sheets(["Leaderboard", "PlayerStats", "Teams", "Matches"], location=loc)
+    from modules.excel_sync import LOCATIONS, set_location
+    loc = st.session_state.get("_location", LOCATIONS[0])
+    set_location(loc)
+
+    # ---------------------------------------------------------------------------
+    # Load data in parallel
+    # ---------------------------------------------------------------------------
+    from modules.excel_sync import load_sheets
+    sheets = load_sheets(["Leaderboard", "PlayerStats", "Teams", "Matches"])
     lb_df  = sheets["Leaderboard"]
     ps_df  = sheets["PlayerStats"]
     teams_df   = sheets["Teams"]
@@ -85,24 +89,24 @@ def render_leaderboard():
             display["total_points"] = pd.to_numeric(display.get("total_points", 0), errors="coerce").fillna(0).astype(int)
             display["total_awards"] = pd.to_numeric(display["total_awards"], errors="coerce").fillna(0).astype(int)
 
+            # Sort display by points (descending), then wins (descending), then losses (ascending)
+            display = display.sort_values(
+                ["total_points", "wins", "losses"],
+                ascending=[False, False, True]
+            ).reset_index(drop=True)
+
             # Status badge
             display["Status"] = display["status"].apply(
                 lambda s: "❌ Eliminated" if s == "Eliminated" else "✅ Active"
             )
             display = display.rename(columns={
-                "rank":         "Rank",
                 "team_name":    "Team",
                 "wins":         "Wins",
                 "losses":       "Losses",
                 "total_points": "Points",
                 "total_awards": "Awards",
             })
-            # Sort by Points DESC, then Wins DESC, then Losses ASC
-            display = display.sort_values(
-                ["Points", "Wins", "Losses"],
-                ascending=[False, False, True],
-            ).reset_index(drop=True)
-            display.insert(0, "Rank", range(1, len(display) + 1))
+            display["Rank"] = range(1, len(display) + 1)
             display = display[["Rank", "Team", "Points", "Wins", "Losses", "Awards", "Status"]]
 
             render_df(

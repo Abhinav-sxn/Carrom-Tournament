@@ -486,8 +486,8 @@ def update_derived_sheets() -> None:
             lambda x: "Eliminated" if (x is True or x == 1) else "Active"
         )
         lb = lb.sort_values(
-            ["wins", "losses", "total_points"],
-            ascending=[False, True, False],
+            ["total_points", "wins", "losses"],
+            ascending=[False, False, True],
         ).reset_index(drop=True)
         lb.insert(0, "rank", range(1, len(lb) + 1))
         lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]

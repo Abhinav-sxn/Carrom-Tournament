@@ -42,7 +42,8 @@ def _home():
         # Load data for the active location (explicit to avoid thread-local mismatches)
         # ---------------------------------------------------------------------------
         loc = st.session_state.get("_location", LOCATIONS[0])
-        from modules.excel_sync import load_sheets
+        from modules.excel_sync import load_sheets, set_location
+        set_location(loc)
         sheets = load_sheets(["Players", "Teams", "Matches", "MatchStats"], location=loc)
         players_df = sheets["Players"]
         teams_df   = sheets["Teams"]
@@ -217,7 +218,7 @@ def _home():
                 display.columns = ["Team", "Wins", "Losses", "Points", "Status"]
                 display = (
                     display
-                    .sort_values(["Wins", "Losses", "Points"], ascending=[False, True, False])
+                    .sort_values(["Points", "Wins", "Losses"], ascending=[False, False, True])
                     .reset_index(drop=True)
                 )
                 display.index += 1
