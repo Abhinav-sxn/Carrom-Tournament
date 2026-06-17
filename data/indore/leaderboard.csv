@@ -1,11 +1,11 @@
 rank,team_id,team_name,wins,losses,status,total_points,total_awards
-1,1,Mavericks (Shri & Aashish),0,0,Active,0,0
-2,2,Thunders (Prateek & Vivek),0,0,Active,0,0
-3,3,Carrom Crushers (Aayush & Aishwarya),0,0,Active,0,0
-4,4,Invincibles (Lokendra & Bharat),0,0,Active,0,0
-5,5,Pocket Legends (Aklesh & Shailendra),0,0,Active,0,0
-6,6,Royal Strikers (Samir & Nitesh),0,0,Active,0,0
-7,7,Carrom Warriors (Pramod  &  Sachin),0,0,Active,0,0
-8,8,Board Blaster (Aakash & Sandeep),0,0,Active,0,0
-9,9,Alpha Wolves (Kamlesh & Hareesh),0,0,Active,0,0
-10,10,Infinity (Praveen & Ved),0,0,Active,0,0
+1,4,Invincibles (Lokendra & Bharat),1,0,Active,13,0
+2,10,Infinity (Praveen & Ved),1,0,Active,11,0
+3,7,Carrom Warriors (Pramod  &  Sachin),0,1,Active,10,0
+4,3,Carrom Crushers (Aayush & Aishwarya),0,1,Active,9,0
+5,1,Mavericks (Shri & Aashish),0,0,Active,0,0
+6,2,Thunders (Prateek & Vivek),0,0,Active,0,0
+7,5,Pocket Legends (Aklesh & Shailendra),0,0,Active,0,0
+8,6,Royal Strikers (Samir & Nitesh),0,0,Active,0,0
+9,8,Board Blaster (Aakash & Sandeep),0,0,Active,0,0
+10,9,Alpha Wolves (Kamlesh & Hareesh),0,0,Active,0,0
