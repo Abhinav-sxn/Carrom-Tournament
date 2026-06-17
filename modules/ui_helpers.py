@@ -139,52 +139,55 @@ hr {{
     margin: 1.8rem 0 !important;
 }}
 
-[data-testid="metric-container"] {{
-    background: linear-gradient(135deg, {card1} 0%, {card2} 100%) !important;
+[data-testid="metric-container"],
+[data-testid="stMetric"],
+[data-testid="stMetricContainer"] {{
+    background: {card1} !important;
     border: 1px solid {border} !important;
-    border-left: 3px solid #C00000 !important;
-    border-radius: 14px !important;
+    border-left: 4px solid #7C3AED !important;
+    border-radius: 12px !important;
     padding: 1.2rem 1.5rem !important;
-    box-shadow: 0 2px 12px {shadow} !important;
+    box-shadow: 0 4px 10px {shadow} !important;
     transition: transform 0.15s ease, box-shadow 0.15s ease !important;
 }}
-[data-testid="metric-container"]:hover {{
+[data-testid="metric-container"]:hover,
+[data-testid="stMetricContainer"]:hover {{
     transform: translateY(-2px) !important;
-    box-shadow: 0 6px 22px rgba(192,0,0,0.18) !important;
+    box-shadow: 0 6px 16px rgba(124,58,237,0.16) !important;
 }}
 [data-testid="stMetricLabel"] {{
-    font-size: 0.7rem !important;
-    font-weight: 600 !important;
+    font-size: 0.72rem !important;
+    font-weight: 500 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.1em !important;
+    letter-spacing: 0.08em !important;
     color: {muted} !important;
 }}
 [data-testid="stMetricValue"] {{
-    font-size: 2rem !important;
+    font-size: 1.85rem !important;
     font-weight: 700 !important;
     color: {text} !important;
 }}
 
 .stButton > button {{
-    background: linear-gradient(135deg, #C00000 0%, #960000 100%) !important;
+    background: #7C3AED !important;
     color: #fff !important;
     border: none !important;
-    border-radius: 9px !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
-    letter-spacing: 0.03em !important;
-    padding: 0.55rem 1.6rem !important;
-    box-shadow: 0 2px 10px rgba(192,0,0,0.35) !important;
-    transition: all 0.18s ease !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 0.88rem !important;
+    letter-spacing: 0.01em !important;
+    padding: 0.5rem 1.4rem !important;
+    box-shadow: 0 2px 6px rgba(124,58,237,0.2) !important;
+    transition: all 0.15s ease !important;
 }}
 .stButton > button:hover {{
-    background: linear-gradient(135deg, #D40000 0%, #B00000 100%) !important;
-    box-shadow: 0 4px 18px rgba(192,0,0,0.5) !important;
+    background: #6D28D9 !important;
+    box-shadow: 0 4px 12px rgba(124,58,237,0.25) !important;
     transform: translateY(-1px) !important;
 }}
 .stButton > button:active {{
     transform: translateY(0) !important;
-    box-shadow: 0 2px 8px rgba(192,0,0,0.3) !important;
+    box-shadow: 0 2px 4px rgba(124,58,237,0.15) !important;
 }}
 
 [data-testid="stExpander"] {{
@@ -302,8 +305,8 @@ hr {{
     color: {text} !important;
 }}
 [data-testid="stSidebarNav"] li > a:hover {{
-    background: rgba(192,0,0,0.14) !important;
-    color: #FF5555 !important;
+    background: rgba(124,58,237,0.12) !important;
+    color: #A78BFA !important;
 }}
 
 /* Main content area */
