@@ -291,13 +291,11 @@ def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str
     return results
 
 
-def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
-    """Save a sheet to Supabase (if configured) or fallback to its CSV file."""
-    loc = _get_location().lower()
-    
-    # Try Supabase first
+def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
+    """Internal: persist to Supabase + CSV without triggering derived-sheet updates.
+    Always call this from update_derived_sheets() to avoid infinite recursion.
+    """
     client = _get_supabase_client()
-    supabase_success = False
     if client is not None:
         try:
             table_name = _sheet_to_supabase_table(sheet_name)
@@ -311,29 +309,35 @@ def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
                         pass
                     else:
                         r[k] = str(v)
-            # Delete old records and insert new ones
             client.table(table_name).delete().eq("location", loc).execute()
             if records:
                 client.table(table_name).insert(records).execute()
-            supabase_success = True
         except Exception as e:
             print(f"Supabase save failed for {sheet_name}: {e}")
-            
-    # Always write to local CSV as secondary/fallback store so local dev/tests stay in sync
+
     try:
         _ensure_data_dir(location=loc)
         df.to_csv(_csv_path(sheet_name, location=loc), index=False)
     except Exception:
         pass
 
-    # Bust Streamlit caches
+
+def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
+    """Save a sheet to Supabase (if configured) or fallback to its CSV file."""
+    loc = _get_location().lower()
+
+    # Persist to Supabase + local CSV
+    _save_raw(sheet_name, df, loc)
+
+    # Bust Streamlit caches AFTER the write has completed
     try:
         import streamlit as st
         st.cache_data.clear()
-        pass
     except Exception:
         pass
 
+    # Update derived sheets (Leaderboard, PlayerStats) when source data changes.
+    # These use _save_raw internally to avoid recursing back into save_sheet.
     if sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
         update_derived_sheets()
 
@@ -350,8 +354,10 @@ def update_derived_sheets() -> None:
     """Recompute Leaderboard and PlayerStats from source data and save as CSVs.
 
     Called automatically by save_sheet() whenever source data changes.
+    Uses _save_raw() (not save_sheet()) to avoid infinite recursion.
     """
     _ensure_data_dir()
+    loc = _get_location().lower()
 
     teams_df   = load_sheet("Teams")
     players_df = load_sheet("Players")
@@ -416,13 +422,12 @@ def update_derived_sheets() -> None:
         lb.insert(0, "rank", range(1, len(lb) + 1))
         lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]
 
-        save_sheet("Leaderboard", lb)
+        _save_raw("Leaderboard", lb, loc)
 
     # ---- PlayerStats -------------------------------------------------------
     if players_df.empty:
-        pd.DataFrame(columns=SHEET_HEADERS["PlayerStats"]).to_csv(
-            _csv_path("PlayerStats"), index=False
-        )
+        empty_ps = pd.DataFrame(columns=SHEET_HEADERS["PlayerStats"])
+        _save_raw("PlayerStats", empty_ps, loc)
     else:
         ps = players_df[["player_id", "name", "team_id"]].copy()
 
@@ -448,5 +453,4 @@ def update_derived_sheets() -> None:
 
         ps["total_awards"] = ps[AWARDS].sum(axis=1)
         ps = ps[["player_id", "name", "team_name"] + AWARDS + ["total_awards"]]
-
-        save_sheet("PlayerStats", ps)
+        _save_raw("PlayerStats", ps, loc)
