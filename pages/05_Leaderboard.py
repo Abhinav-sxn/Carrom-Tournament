@@ -15,7 +15,6 @@ st.title("🏆 Leaderboard & Stats")
 st.caption("Live team standings, elimination tracker, and player award totals.")
 st.markdown("---")
 
-@st.fragment(run_every=5)
 def render_leaderboard():
     # ---------------------------------------------------------------------------
     # Sync active location for this fragment execution thread

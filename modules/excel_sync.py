@@ -126,6 +126,81 @@ HEADER_COLORS = {
     "PlayerStats": "00B0F0",   # Light blue
 }
 
+
+_local_versions: dict[str, int] = {}
+
+
+def _get_supabase_sync_version(loc_lower: str) -> int:
+    client = _get_supabase_client()
+    if client is None:
+        return 1
+    try:
+        response = client.table("sync_state").select("version").eq("location", loc_lower).execute()
+        data = response.data
+        if data:
+            return int(data[0]["version"])
+    except Exception as e:
+        print(f"Error fetching supabase sync version: {e}")
+    return 1
+
+
+try:
+    import streamlit as _st
+    _get_supabase_sync_version_cached = _st.cache_data(ttl=3, show_spinner=False)(_get_supabase_sync_version)
+except Exception:
+    _get_supabase_sync_version_cached = _get_supabase_sync_version
+
+
+def get_sync_version(loc: str) -> int:
+    """Return a version indicator that changes when the database/CSVs are updated."""
+    loc_lower = loc.lower()
+    client = _get_supabase_client()
+    if client is not None:
+        try:
+            return _get_supabase_sync_version_cached(loc_lower)
+        except Exception:
+            pass
+
+    # Fallback to local CSV modification time hash
+    try:
+        mtimes = []
+        for sheet_name in SHEET_HEADERS:
+            path = _csv_path(sheet_name, location=loc)
+            if os.path.exists(path):
+                mtimes.append(os.path.getmtime(path))
+        if mtimes:
+            return hash(tuple(mtimes))
+    except Exception:
+        pass
+
+    return _local_versions.get(loc_lower, 1)
+
+
+def _increment_sync_version(loc: str) -> None:
+    """Increment the sync version for a location, both in local memory and in Supabase."""
+    loc_lower = loc.lower()
+    _local_versions[loc_lower] = _local_versions.get(loc_lower, 1) + 1
+
+    client = _get_supabase_client()
+    if client is not None:
+        try:
+            response = client.table("sync_state").select("version").eq("location", loc_lower).execute()
+            data = response.data
+            if data:
+                new_version = int(data[0]["version"]) + 1
+                client.table("sync_state").update({"version": new_version}).eq("location", loc_lower).execute()
+            else:
+                client.table("sync_state").insert({"location": loc_lower, "version": 1}).execute()
+            
+            # Clear the read cache so next get_sync_version call sees it instantly
+            try:
+                _get_supabase_sync_version_cached.clear()
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Failed to increment sync version for {loc}: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -287,6 +362,38 @@ except Exception:
     pass
 
 
+def _get_session_cache(sheet_name: str, loc: str) -> pd.DataFrame | None:
+    try:
+        import streamlit as st
+        state = st.session_state
+        cache_key = f"_db_cache_{loc.lower()}"
+        if cache_key in state:
+            cache = state[cache_key]
+            # Check version
+            current_version = get_sync_version(loc)
+            if cache.get("version") == current_version:
+                return cache.get("sheets", {}).get(sheet_name)
+    except Exception:
+        pass
+    return None
+
+
+def _put_session_cache(sheet_name: str, loc: str, df: pd.DataFrame) -> None:
+    try:
+        import streamlit as st
+        state = st.session_state
+        cache_key = f"_db_cache_{loc.lower()}"
+        current_version = get_sync_version(loc)
+        if cache_key not in state or state[cache_key].get("version") != current_version:
+            state[cache_key] = {
+                "version": current_version,
+                "sheets": {}
+            }
+        state[cache_key]["sheets"][sheet_name] = df.copy()
+    except Exception:
+        pass
+
+
 def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
     """Load a sheet from Supabase (if configured) or fallback to its CSV file."""
     loc = (location or _get_location()).lower()
@@ -297,20 +404,30 @@ def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
     if cached is not None:
         return cached
 
-    # 2. Try Supabase
+    # 2. Check the session-state version cache
+    session_cached = _get_session_cache(sheet_name, loc)
+    if session_cached is not None:
+        return session_cached
+
+    # 3. Try Supabase
     supabase_df = _load_from_supabase(sheet_name, loc)
     if supabase_df is not None:
+        _put_session_cache(sheet_name, loc, supabase_df)
         return supabase_df
 
-    # 3. Fallback to local CSV
+    # 4. Fallback to local CSV
     _ensure_data_dir(location)
     expected_cols = SHEET_HEADERS.get(sheet_name, [])
     path = _csv_path(sheet_name, location)
 
     if not os.path.exists(path):
-        return pd.DataFrame(columns=expected_cols)
+        empty_df = pd.DataFrame(columns=expected_cols)
+        _put_session_cache(sheet_name, loc, empty_df)
+        return empty_df
 
-    return _load_csv_from_path(path, sheet_name)
+    df = _load_csv_from_path(path, sheet_name)
+    _put_session_cache(sheet_name, loc, df)
+    return df
 
 
 def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str, pd.DataFrame]:
@@ -322,12 +439,28 @@ def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str
     loc = location or _get_location()
 
     results = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sheet_names), 6)) as executor:
-        futures = {executor.submit(load_sheet, sn, loc): sn for sn in sheet_names}
+    remaining_sheets = []
+
+    # Check cache first on the main thread
+    for sn in sheet_names:
+        cached = _pc_get(sn, loc) or _get_session_cache(sn, loc)
+        if cached is not None:
+            results[sn] = cached
+        else:
+            remaining_sheets.append(sn)
+
+    if not remaining_sheets:
+        return results
+
+    # Load remaining sheets in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(remaining_sheets), 6)) as executor:
+        futures = {executor.submit(load_sheet, sn, loc): sn for sn in remaining_sheets}
         for future in concurrent.futures.as_completed(futures):
             sn = futures[future]
             try:
-                results[sn] = future.result()
+                df = future.result()
+                results[sn] = df
+                _put_session_cache(sn, loc, df)
             except Exception as e:
                 print(f"Parallel load failed for {sn}: {e}")
                 results[sn] = pd.DataFrame(columns=SHEET_HEADERS.get(sn, []))
@@ -380,6 +513,8 @@ def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
         df.to_csv(_csv_path(sheet_name, location=loc), index=False)
     except Exception:
         pass
+
+    _increment_sync_version(loc)
 
 
 def save_sheet(sheet_name: str, df: pd.DataFrame, _skip_derived: bool = False) -> None:

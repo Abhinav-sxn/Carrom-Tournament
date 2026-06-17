@@ -36,7 +36,6 @@ def _home():
     render_logo()      # sets active location first
     init_workbook()    # creates location-specific CSV files if they don't exist
 
-    @st.fragment(run_every=5)
     def render_dashboard():
         # ---------------------------------------------------------------------------
         # Load data for the active location (explicit to avoid thread-local mismatches)

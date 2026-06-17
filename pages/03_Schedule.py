@@ -28,6 +28,23 @@ teams_df   = sheets["Teams"]
 matches_df = sheets["Matches"]
 players_df = sheets["Players"]
 
+# Initialize pending schedule changes
+if "pending_schedule_changes" not in st.session_state:
+    st.session_state["pending_schedule_changes"] = {}
+
+# Merge pending changes into matches_df for real-time preview before saving
+if not matches_df.empty and st.session_state["pending_schedule_changes"]:
+    matches_df = matches_df.copy()
+    matches_df["scheduled_date"] = matches_df["scheduled_date"].astype(object)
+    matches_df["scheduled_time"] = matches_df.get("scheduled_time", None).astype(object)
+    for (m_id, field), val in st.session_state["pending_schedule_changes"].items():
+        if field == "date":
+            val_str = str(val) if val is not None else None
+            matches_df.loc[matches_df["match_id"].astype(int) == m_id, "scheduled_date"] = val_str
+        elif field == "time":
+            val_str = val.strftime("%H:%M") if val is not None else None
+            matches_df.loc[matches_df["match_id"].astype(int) == m_id, "scheduled_time"] = val_str
+
 teams_exist   = not teams_df.empty
 matches_exist = not matches_df.empty
 
@@ -197,7 +214,7 @@ for _, row in display_df.iterrows():
                 label_visibility="collapsed",
             )
             if new_date != cur_val:
-                set_match_scheduled_date(match_id, new_date)
+                st.session_state["pending_schedule_changes"][(match_id, "date")] = new_date
                 st.rerun()
             # Time input (admin)
             cur_time = None
@@ -214,13 +231,44 @@ for _, row in display_df.iterrows():
                 label_visibility="collapsed",
             )
             if new_time != cur_time:
-                set_match_scheduled_time(match_id, new_time)
+                st.session_state["pending_schedule_changes"][(match_id, "time")] = new_time
                 st.rerun()
         else:
             # Viewer: show date badge and the scheduled time (or TBD)
             sched_time = row.get("scheduled_time", None)
             time_text = sched_time if sched_time and str(sched_time) not in ("", "nan", "None") else "TBD"
             col_date.markdown(f"{date_badge(sched_date)}  \n**{time_text}**", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Unsaved changes banner (admin only)
+# ---------------------------------------------------------------------------
+if auth.is_admin() and st.session_state.get("pending_schedule_changes"):
+    st.markdown("---")
+    st.warning("⚠️ You have unsaved schedule changes!")
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("💾 Save Schedule Changes", type="primary", use_container_width=True):
+            from modules.excel_sync import save_sheet
+            df = load_sheet("Matches")
+            df["scheduled_date"] = df["scheduled_date"].astype(object)
+            df["scheduled_time"] = df.get("scheduled_time", None).astype(object)
+            
+            for (m_id, field), val in st.session_state["pending_schedule_changes"].items():
+                if field == "date":
+                    val_str = str(val) if val is not None else None
+                    df.loc[df["match_id"].astype(int) == m_id, "scheduled_date"] = val_str
+                elif field == "time":
+                    val_str = val.strftime("%H:%M") if val is not None else None
+                    df.loc[df["match_id"].astype(int) == m_id, "scheduled_time"] = val_str
+                    
+            save_sheet("Matches", df)
+            st.session_state["pending_schedule_changes"] = {}
+            st.success("Schedule changes saved successfully!")
+            st.rerun()
+    with btn_col2:
+        if st.button("🔄 Discard Changes", type="secondary", use_container_width=True):
+            st.session_state["pending_schedule_changes"] = {}
+            st.rerun()
 
 # ---------------------------------------------------------------------------
 # Champion banner
