@@ -213,7 +213,7 @@ def _home():
             display.columns = ["Team", "Wins", "Losses", "Points", "Status"]
             display = (
                 display
-                .sort_values(["Points", "Wins", "Losses"], ascending=[False, False, True])
+                .sort_values(["Wins", "Losses", "Points"], ascending=[False, True, False])
                 .reset_index(drop=True)
             )
             display.index += 1

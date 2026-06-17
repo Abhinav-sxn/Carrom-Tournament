@@ -23,7 +23,10 @@ except Exception:  # pragma: no cover - import-time when not running in Streamli
 def _check_password(password: str) -> bool:
     if st is None:
         return False
-    stored = st.secrets.get("ADMIN_PASSWORD_HASH")
+    try:
+        stored = st.secrets.get("ADMIN_PASSWORD_HASH")
+    except Exception:
+        return False
     if not stored:
         return False
     return hashlib.sha256(password.encode()).hexdigest() == stored

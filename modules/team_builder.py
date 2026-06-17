@@ -98,13 +98,8 @@ def build_balanced_teams(custom_pairing: list | None = None) -> pd.DataFrame:
         )
 
     players_df = load_sheet("Players")
-    if players_df.empty or len(players_df) < 4:
-        raise RuntimeError("At least 4 players are required to form teams.")
-    if len(players_df) % 2 != 0:
-        raise RuntimeError(
-            f"An even number of players is required for 2v2 teams. "
-            f"Currently {len(players_df)} players registered."
-        )
+    if players_df.empty or len(players_df) < 3:
+        raise RuntimeError("At least 3 players are required to form teams.")
 
     players_map = {int(row["player_id"]): row for _, row in players_df.iterrows()}
 
@@ -117,12 +112,20 @@ def build_balanced_teams(custom_pairing: list | None = None) -> pd.DataFrame:
     else:
         pairing = get_default_pairing(players_df)
 
+    paired_pids = set()
+    for pid1, pid2 in pairing:
+        paired_pids.add(pid1)
+        paired_pids.add(pid2)
+
+    leftover_pids = [pid for pid in players_map if pid not in paired_pids]
+
     teams = []
+    base_team_id = get_next_id("Teams", "team_id")
     for i, (pid1, pid2) in enumerate(pairing):
         p1 = players_map[pid1]
         p2 = players_map[pid2]
         avg = round((float(p1["skill_rating"]) + float(p2["skill_rating"])) / 2, 2)
-        team_id = get_next_id("Teams", "team_id") + i
+        team_id = base_team_id + i
         teams.append({
             "team_id":       team_id,
             "team_name":     f"Team {_num_to_letter(i)}",
@@ -132,14 +135,32 @@ def build_balanced_teams(custom_pairing: list | None = None) -> pd.DataFrame:
             "is_eliminated": False,
         })
 
+    leftover_team = None
+    if leftover_pids:
+        leftover_pid = leftover_pids[0]
+        p = players_map[leftover_pid]
+        team_id = base_team_id + len(pairing)
+        leftover_team = {
+            "team_id":       team_id,
+            "team_name":     f"Team {_num_to_letter(len(pairing))} ({p['name']} - Single)",
+            "avg_skill":     float(p["skill_rating"]),
+            "wins":          0,
+            "losses":        0,
+            "is_eliminated": False,
+        }
+        teams.append(leftover_team)
+
     teams_df = pd.DataFrame(teams)
     save_sheet("Teams", teams_df)
 
     # Assign team_ids back to players (bulk update)
     players_copy = players_df.copy()
-    for team, (pid1, pid2) in zip(teams, pairing):
+    for team, (pid1, pid2) in zip(teams[:len(pairing)], pairing):
         players_copy.loc[players_copy["player_id"] == pid1, "team_id"] = team["team_id"]
         players_copy.loc[players_copy["player_id"] == pid2, "team_id"] = team["team_id"]
+
+    if leftover_team is not None:
+        players_copy.loc[players_copy["player_id"] == leftover_pids[0], "team_id"] = leftover_team["team_id"]
 
     save_sheet("Players", players_copy)
     return teams_df

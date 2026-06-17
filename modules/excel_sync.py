@@ -267,16 +267,76 @@ except Exception:
     pass  # not running inside Streamlit — use uncached version
 
 
+
+
+
+def _sheet_to_supabase_table(sheet_name: str) -> str:
+    mapping = {
+        "Players": "players",
+        "Teams": "teams",
+        "Matches": "matches",
+        "MatchStats": "match_stats",
+        "Leaderboard": "leaderboard",
+        "PlayerStats": "player_stats",
+    }
+    return mapping.get(sheet_name, sheet_name.lower())
+
+
+def _get_supabase_client():
+    try:
+        import streamlit as st
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_KEY")
+        if url and key:
+            from supabase import create_client
+            return create_client(url, key)
+    except Exception:
+        pass
+    return None
+
+
+def _load_from_supabase(sheet_name: str, location: str) -> pd.DataFrame | None:
+    client = _get_supabase_client()
+    if client is None:
+        return None
+    try:
+        table_name = _sheet_to_supabase_table(sheet_name)
+        response = client.table(table_name).select("*").eq("location", location).execute()
+        data = response.data
+        expected_cols = SHEET_HEADERS.get(sheet_name, [])
+        if not data:
+            return pd.DataFrame(columns=expected_cols)
+        df = pd.DataFrame(data)
+        if "location" in df.columns:
+            df = df.drop(columns=["location"])
+        # Backfill any columns added to SHEET_HEADERS
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = None
+        df = df[[col for col in expected_cols if col in df.columns]]
+        return df
+    except Exception as e:
+        print(f"Supabase load failed for {sheet_name} ({location}): {e}")
+        return None
+
+
+try:
+    import streamlit as _st
+    _load_from_supabase = _st.cache_data(ttl=3, show_spinner=False)(_load_from_supabase)
+except Exception:
+    pass
+
+
 def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
-    """Load a sheet from its CSV file.
-
-    If the local file is absent (e.g. after a Streamlit Cloud container restart),
-    the latest version is pulled from GitHub before falling back to an empty frame.
-
-    Pass *location* to read a specific location's data without touching the
-    module-level active location.  Omit it (or pass None) to use the current
-    active location (the normal case for all page modules).
-    """
+    """Load a sheet from Supabase (if configured) or fallback to its CSV file."""
+    loc = (location or _get_location()).lower()
+    
+    # Try Supabase first
+    supabase_df = _load_from_supabase(sheet_name, loc)
+    if supabase_df is not None:
+        return supabase_df
+        
+    # Fallback to local CSV
     _ensure_data_dir(location)
     expected_cols = SHEET_HEADERS.get(sheet_name, [])
     path = _csv_path(sheet_name, location)
@@ -298,20 +358,46 @@ def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
 
 
 def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
-    """Overwrite a sheet's CSV file and commit it to GitHub.
+    """Save a sheet to Supabase (if configured) or fallback to its CSV file."""
+    loc = _get_location().lower()
+    
+    # Try Supabase first
+    client = _get_supabase_client()
+    supabase_success = False
+    if client is not None:
+        try:
+            table_name = _sheet_to_supabase_table(sheet_name)
+            records = df.to_dict(orient="records")
+            for r in records:
+                r["location"] = loc
+                for k, v in list(r.items()):
+                    if pd.isna(v):
+                        r[k] = None
+                    elif isinstance(v, (bool, int, float, str)):
+                        pass
+                    else:
+                        r[k] = str(v)
+            # Delete old records and insert new ones
+            client.table(table_name).delete().eq("location", loc).execute()
+            if records:
+                client.table(table_name).insert(records).execute()
+            supabase_success = True
+        except Exception as e:
+            print(f"Supabase save failed for {sheet_name}: {e}")
+            
+    # Always write to local CSV as secondary/fallback store so local dev/tests stay in sync
+    try:
+        _ensure_data_dir(location=loc)
+        df.to_csv(_csv_path(sheet_name, location=loc), index=False)
+    except Exception:
+        pass
 
-    Automatically recomputes derived sheets (Leaderboard, PlayerStats)
-    when saving source data.
-    """
-    _ensure_data_dir()
-    df.to_csv(_csv_path(sheet_name), index=False)
-
-    # Bust ALL cached reads + workbook so the next rerun sees fresh data,
-    # then mark dirty for deferred GitHub push when admin is active.
+    # Bust Streamlit caches
     try:
         import streamlit as st
         st.cache_data.clear()
-        if st.session_state.get("is_admin", False):
+        # GitHub push is only needed if not using Supabase
+        if not supabase_success and st.session_state.get("is_admin", False):
             _mark_dirty(sheet_name)
             _ensure_bg_thread()
     except Exception:
@@ -394,14 +480,13 @@ def update_derived_sheets() -> None:
             lambda x: "Eliminated" if (x is True or x == 1) else "Active"
         )
         lb = lb.sort_values(
-            ["total_points", "wins", "losses"],
-            ascending=[False, False, True],
+            ["wins", "losses", "total_points"],
+            ascending=[False, True, False],
         ).reset_index(drop=True)
         lb.insert(0, "rank", range(1, len(lb) + 1))
         lb = lb[["rank", "team_id", "team_name", "wins", "losses", "status", "total_points", "total_awards"]]
 
-        lb.to_csv(_csv_path("Leaderboard"), index=False)
-        _mark_dirty("Leaderboard")
+        save_sheet("Leaderboard", lb)
 
     # ---- PlayerStats -------------------------------------------------------
     if players_df.empty:
@@ -435,5 +520,4 @@ def update_derived_sheets() -> None:
         ps["total_awards"] = ps[AWARDS].sum(axis=1)
         ps = ps[["player_id", "name", "team_name"] + AWARDS + ["total_awards"]]
 
-        ps.to_csv(_csv_path("PlayerStats"), index=False)
-        _mark_dirty("PlayerStats")
+        save_sheet("PlayerStats", ps)

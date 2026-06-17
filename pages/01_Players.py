@@ -97,10 +97,10 @@ else:
 
     # Player count status
     n = len(players_df)
-    if n < 4:
-        st.warning(f"{n} player(s) registered — need at least 4 to build teams.")
+    if n < 3:
+        st.warning(f"{n} player(s) registered — need at least 3 to build teams.")
     elif n % 2 != 0:
-        st.warning(f"{n} players registered — need an **even** number for 2v2 teams.")
+        st.info(f"{n} players registered — ready to build **{n // 2} teams** of 2 and **1 single-player team** (which will receive byes).")
     else:
         st.success(f"{n} players registered — ready to build **{n // 2} teams** on the Teams page.")
 

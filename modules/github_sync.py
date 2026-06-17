@@ -22,7 +22,7 @@ def _is_configured() -> bool:
         _ = st.secrets["GITHUB_TOKEN"]
         _ = st.secrets["GITHUB_REPO"]
         return True
-    except (KeyError, FileNotFoundError):
+    except Exception:
         return False
 
 

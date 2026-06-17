@@ -18,6 +18,34 @@ from datetime import date
 from modules.excel_sync import load_sheet, save_sheet, get_next_id, AWARDS
 
 
+def recalculate_team_stats() -> None:
+    """Recalculate wins, losses, and is_eliminated for all teams from scratch."""
+    teams_df   = load_sheet("Teams")
+    matches_df = load_sheet("Matches")
+    if teams_df.empty:
+        return
+
+    teams_df["wins"] = 0
+    teams_df["losses"] = 0
+    teams_df["is_eliminated"] = False
+
+    completed = matches_df[matches_df["status"].isin(["done", "bye"])]
+    if not completed.empty:
+        win_counts = completed["winner_id"].dropna().astype(int).value_counts().to_dict()
+        loss_counts = completed["loser_id"].dropna().astype(int).value_counts().to_dict()
+        
+        for idx, row in teams_df.iterrows():
+            tid = int(row["team_id"])
+            wins = win_counts.get(tid, 0)
+            losses = loss_counts.get(tid, 0)
+            teams_df.loc[idx, "wins"] = wins
+            teams_df.loc[idx, "losses"] = losses
+            if losses >= 2:
+                teams_df.loc[idx, "is_eliminated"] = True
+                
+    save_sheet("Teams", teams_df)
+
+
 def record_result(
     match_id: int,
     winner_team_id: int,
@@ -68,32 +96,8 @@ def record_result(
     matches_df.loc[mask, "team_b_score"] = int(team_b_score)
     save_sheet("Matches", matches_df)
 
-    # Update team stats
-    teams_df = load_sheet("Teams")
-    teams_df["wins"]   = pd.to_numeric(teams_df["wins"],   errors="coerce").fillna(0).astype(int)
-    teams_df["losses"] = pd.to_numeric(teams_df["losses"], errors="coerce").fillna(0).astype(int)
-
-    teams_df.loc[teams_df["team_id"] == winner_team_id, "wins"]   += 1
-    teams_df.loc[teams_df["team_id"] == loser_team_id,  "losses"] += 1
-
-    # Finals = winner takes all: loser out, winner un-eliminated (champion, even if from pool elimination)
-    is_finals = str(row["bracket"]).lower() == "finals"
-    if is_finals:
-        teams_df.loc[teams_df["team_id"] == loser_team_id,  "is_eliminated"] = True
-        teams_df.loc[teams_df["team_id"] == winner_team_id, "is_eliminated"] = False
-    else:
-        # Eliminate loser if they now have 2 losses
-        loser_losses = int(
-            teams_df.loc[teams_df["team_id"] == loser_team_id, "losses"].iloc[0]
-        )
-        if loser_losses >= 2:
-            teams_df.loc[teams_df["team_id"] == loser_team_id, "is_eliminated"] = True
-
-    save_sheet("Teams", teams_df)
-
-    # Do not advance bracket after finals — tournament is over
-    if is_finals:
-        return
+    # Recalculate team stats
+    recalculate_team_stats()
 
     # Advance bracket (import here to avoid circular imports at module level)
     from modules.match_scheduler import advance_bracket
@@ -202,12 +206,25 @@ def edit_match_result(
     if str(matches_df.loc[mask].iloc[0]["status"]) != "done":
         raise ValueError(f"Match {match_id} is not completed — use the record form instead.")
 
+    row = matches_df.loc[mask].iloc[0]
+    team_a = int(row["team_a_id"])
+    team_b = int(row["team_b_id"])
+
+    # Determine winner and loser based on corrected scores
+    if int(team_a_score) >= int(team_b_score):
+        winner_id, loser_id = team_a, team_b
+    else:
+        winner_id, loser_id = team_b, team_a
+
     matches_df["team_a_score"] = pd.to_numeric(
         matches_df.get("team_a_score", 0), errors="coerce"
     ).fillna(0).astype(int)
     matches_df["team_b_score"] = pd.to_numeric(
         matches_df.get("team_b_score", 0), errors="coerce"
     ).fillna(0).astype(int)
+    
+    matches_df.loc[mask, "winner_id"]    = winner_id
+    matches_df.loc[mask, "loser_id"]     = loser_id
     matches_df.loc[mask, "team_a_score"] = max(0, min(int(team_a_score), 24))
     matches_df.loc[mask, "team_b_score"] = max(0, min(int(team_b_score), 24))
     save_sheet("Matches", matches_df)
@@ -218,7 +235,7 @@ def edit_match_result(
         if not ms_df.empty:
             ms_df = ms_df[ms_df["match_id"] != match_id].reset_index(drop=True)
 
-        pid_to_tid: dict = {}
+        pid_to_tid = {}
         if not players_df.empty:
             pid_to_tid = players_df.dropna(subset=["player_id"]).set_index(
                 players_df["player_id"].astype(int)
@@ -227,17 +244,24 @@ def edit_match_result(
         new_rows = []
         base_stat_id = get_next_id("MatchStats", "stat_id")
         for offset, (player_id, awards) in enumerate(award_map.items()):
-            row = {
+            row_dict = {
                 "stat_id":   base_stat_id + offset,
                 "match_id":  match_id,
                 "player_id": int(player_id),
                 "team_id":   pid_to_tid.get(int(player_id)),
             }
             for award in AWARDS:
-                row[award] = int(bool(awards.get(award, 0)))
-            new_rows.append(row)
+                row_dict[award] = int(bool(awards.get(award, 0)))
+            new_rows.append(row_dict)
 
         if new_rows:
             ms_df = pd.concat([ms_df, pd.DataFrame(new_rows)], ignore_index=True)
         save_sheet("MatchStats", ms_df)
+
+    # Recalculate team stats
+    recalculate_team_stats()
+
+    # Advance bracket in case of changes
+    from modules.match_scheduler import advance_bracket
+    advance_bracket(match_id)
 

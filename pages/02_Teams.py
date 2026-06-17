@@ -33,13 +33,8 @@ n_players      = len(players_df)
 if not teams_exist:
     st.subheader("Build Balanced Teams")
 
-    if n_players < 4:
-        st.warning(f"Only {n_players} player(s) registered. Head to **Players** and add at least 4.")
-    elif n_players % 2 != 0:
-        st.warning(
-            f"{n_players} players registered \u2014 need an **even** number for 2v2. "
-            "Head to **Players** to add one more."
-        )
+    if n_players < 3:
+        st.warning(f"Only {n_players} player(s) registered. Head to **Players** and add at least 3.")
     else:
         # ------------------------------------------------------------------
         # Initialise / validate the working pairing in session state.
