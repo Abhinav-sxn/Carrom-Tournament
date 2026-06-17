@@ -6,3 +6,5 @@
 
 # Streamlit secrets (never commit real tokens)
 .streamlit/secrets.toml
+__pycache__/
+**/__pycache__/

@@ -288,6 +288,11 @@ def _get_supabase_client():
         url = st.secrets.get("SUPABASE_URL")
         key = st.secrets.get("SUPABASE_KEY")
         if url and key:
+            url = url.strip()
+            if url.endswith("/rest/v1/"):
+                url = url[:-9]
+            elif url.endswith("/rest/v1"):
+                url = url[:-8]
             from supabase import create_client
             return create_client(url, key)
     except Exception:
@@ -297,6 +302,12 @@ def _get_supabase_client():
 
 def _check_supabase_connection(url: str, key: str) -> dict:
     try:
+        if url:
+            url = url.strip()
+            if url.endswith("/rest/v1/"):
+                url = url[:-9]
+            elif url.endswith("/rest/v1"):
+                url = url[:-8]
         from supabase import create_client
         client = create_client(url, key)
         # Select a single row from players table to check read access

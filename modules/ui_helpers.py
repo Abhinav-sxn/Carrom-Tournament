@@ -435,34 +435,21 @@ def render_logo() -> None:
     try:
         from modules.excel_sync import get_db_status
         db_info = get_db_status()
-        if db_info["status"] == "supabase":
-            st.sidebar.markdown(
-                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #10B981; font-weight: 500; display: flex; align-items: center; gap: 6px;'>"
-                f"<span style='height: 8px; width: 8px; background-color: #10B981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10B981;'></span>"
-                f"Database: Connected ({db_info['message']})"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-        elif db_info["status"] == "error":
-            err_msg = str(db_info["message"])
-            if len(err_msg) > 40:
-                err_msg = err_msg[:37] + "..."
-            raw_msg = str(db_info["message"])
-            st.sidebar.markdown(
-                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #EF4444; font-weight: 500; display: flex; align-items: center; gap: 6px;' title='{raw_msg}'>"
-                f"<span style='height: 8px; width: 8px; background-color: #EF4444; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #EF4444;'></span>"
-                f"Database Error: {err_msg}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+        status = db_info.get("status", "local")
+        if status in ("supabase", "local"):
+            color = "#10B981"
+            title_text = f"Connected ({db_info.get('message', 'Active')})"
         else:
-            st.sidebar.markdown(
-                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #8892B0; font-weight: 500; display: flex; align-items: center; gap: 6px;'>"
-                f"<span style='height: 8px; width: 8px; background-color: #8892B0; border-radius: 50%; display: inline-block;'></span>"
-                f"Database: {db_info['message']}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+            color = "#EF4444"
+            title_text = f"Error: {db_info.get('message', 'Unknown database error')}"
+
+        st.sidebar.markdown(
+            f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: {color}; font-weight: 500; display: flex; align-items: center; gap: 6px;' title='{title_text}'>"
+            f"<span style='height: 8px; width: 8px; background-color: {color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px {color};'></span>"
+            f"Database"
+            f"</div>",
+            unsafe_allow_html=True
+        )
     except Exception:
         pass
 
