@@ -189,6 +189,9 @@ def save_match_awards(match_id: int, award_map: dict) -> None:
     except Exception:
         pass
     update_derived_sheets()
+    # Clear the pipeline write cache so the next page load reads from Supabase
+    from modules.excel_sync import _pc_clear
+    _pc_clear()
 
 
 def get_match_awards(match_id: int) -> pd.DataFrame:

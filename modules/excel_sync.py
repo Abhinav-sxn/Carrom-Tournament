@@ -47,6 +47,39 @@ def set_location(loc: str) -> None:
     _tls.active_location = loc
 
 
+# ---------------------------------------------------------------------------
+# Pipeline write cache
+# ---------------------------------------------------------------------------
+# Within a single save pipeline (record_result → save_match_awards), we do
+# many sequential writes followed by reads of data we just wrote.  Without
+# caching those writes in memory, every load_sheet call hits Supabase again
+# (~450 ms each), adding 5+ seconds of pure network wait.
+#
+# _tls.pipeline_cache is a dict[(sheet_name_lower, loc_lower)] -> DataFrame
+# that stores the last written DataFrame per table.  load_sheet consults it
+# before going to Supabase/CSV.  It is cleared at the end of each top-level
+# save_sheet call (the one that triggers update_derived_sheets).
+# ---------------------------------------------------------------------------
+
+def _pc_key(sheet_name: str, loc: str) -> tuple:
+    return (sheet_name.lower(), loc.lower())
+
+
+def _pc_put(sheet_name: str, loc: str, df: "pd.DataFrame") -> None:
+    if not hasattr(_tls, "pipeline_cache"):
+        _tls.pipeline_cache = {}
+    _tls.pipeline_cache[_pc_key(sheet_name, loc)] = df.copy()
+
+
+def _pc_get(sheet_name: str, loc: str) -> "pd.DataFrame | None":
+    cache = getattr(_tls, "pipeline_cache", {})
+    return cache.get(_pc_key(sheet_name, loc))
+
+
+def _pc_clear() -> None:
+    _tls.pipeline_cache = {}
+
+
 def _csv_path(sheet_name: str, location: str | None = None) -> str:
     loc = (location or _get_location()).lower()
     return os.path.join(DATA_DIR, loc, f"{sheet_name.lower()}.csv")
@@ -257,13 +290,19 @@ except Exception:
 def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
     """Load a sheet from Supabase (if configured) or fallback to its CSV file."""
     loc = (location or _get_location()).lower()
-    
-    # Try Supabase first
+
+    # 1. Check the pipeline write cache first — avoids redundant Supabase reads
+    #    within a save pipeline (record_result, save_match_awards, etc.).
+    cached = _pc_get(sheet_name, loc)
+    if cached is not None:
+        return cached
+
+    # 2. Try Supabase
     supabase_df = _load_from_supabase(sheet_name, loc)
     if supabase_df is not None:
         return supabase_df
-        
-    # Fallback to local CSV
+
+    # 3. Fallback to local CSV
     _ensure_data_dir(location)
     expected_cols = SHEET_HEADERS.get(sheet_name, [])
     path = _csv_path(sheet_name, location)
@@ -298,7 +337,12 @@ def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str
 def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
     """Internal: persist to Supabase + CSV without triggering derived-sheet updates.
     Always call this from update_derived_sheets() to avoid infinite recursion.
+    Also stores the written df in the pipeline cache so subsequent load_sheet
+    calls within the same pipeline get instant in-memory results.
     """
+    # Store in pipeline cache immediately so reads within this pipeline are instant
+    _pc_put(sheet_name, loc, df)
+
     client = _get_supabase_client()
     if client is not None:
         try:
@@ -344,12 +388,12 @@ def save_sheet(sheet_name: str, df: pd.DataFrame, _skip_derived: bool = False) -
     Pass _skip_derived=True from within a pipeline of saves to defer the
     derived-sheet recomputation (Leaderboard, PlayerStats) to the very end.
     The cache is ALWAYS cleared so that subsequent load_sheet() calls within
-    the same pipeline get fresh data — skipping this would cause stale reads
-    that overwrite the records we just wrote.
+    the same pipeline get fresh data from Supabase when the pipeline cache
+    doesn't have a newer version.
     """
     loc = _get_location().lower()
 
-    # Persist to Supabase + local CSV
+    # Persist to Supabase + local CSV (also stores in pipeline cache)
     _save_raw(sheet_name, df, loc)
 
     # Always bust Streamlit caches so subsequent load_sheet() calls see fresh data.
@@ -363,6 +407,9 @@ def save_sheet(sheet_name: str, df: pd.DataFrame, _skip_derived: bool = False) -
     # Skip this if the caller will trigger it once at the end of a pipeline.
     if not _skip_derived and sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
         update_derived_sheets()
+        # Clear the pipeline cache once the full pipeline is done so the next
+        # page load reads fresh state from Supabase.
+        _pc_clear()
 
 
 def get_next_id(sheet_name: str, id_column: str) -> int:
