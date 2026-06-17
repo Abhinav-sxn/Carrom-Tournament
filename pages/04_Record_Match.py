@@ -378,8 +378,9 @@ with record_col:
                 if st.button("✅ Save Result & Awards", type="primary", width='stretch'):
                     try:
                         record_result(selected_match_id, winner_id, team_a_score=score_a, team_b_score=score_b)
-                        if award_map:
-                            save_match_awards(selected_match_id, award_map)
+                        # Always call save_match_awards — it does the final cache-bust
+                        # + derived-sheet recompute even if award_map is empty.
+                        save_match_awards(selected_match_id, award_map)
                         st.success(
                             f"Match recorded! **{_tname(winner_id)}** wins.  \n"
                             f"Awards saved for {len(award_map)} player(s)."

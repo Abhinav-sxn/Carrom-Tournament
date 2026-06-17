@@ -322,12 +322,21 @@ def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
         pass
 
 
-def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
-    """Save a sheet to Supabase (if configured) or fallback to its CSV file."""
+def save_sheet(sheet_name: str, df: pd.DataFrame, _raw: bool = False) -> None:
+    """Save a sheet to Supabase (if configured) or fallback to its CSV file.
+
+    Pass _raw=True from within a pipeline of saves to skip the cache-clear and
+    derived-sheet recomputation for that individual call.  The caller is then
+    responsible for calling update_derived_sheets() + st.cache_data.clear() once
+    at the very end, avoiding the O(n) cascade of redundant network trips.
+    """
     loc = _get_location().lower()
 
     # Persist to Supabase + local CSV
     _save_raw(sheet_name, df, loc)
+
+    if _raw:
+        return  # Caller handles cache-bust and derived updates
 
     # Bust Streamlit caches AFTER the write has completed
     try:

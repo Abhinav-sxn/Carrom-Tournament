@@ -15,7 +15,7 @@ Flow:
 
 import pandas as pd
 from datetime import date
-from modules.excel_sync import load_sheet, save_sheet, get_next_id, AWARDS
+from modules.excel_sync import load_sheet, save_sheet, get_next_id, AWARDS, update_derived_sheets
 
 
 def recalculate_team_stats() -> None:
@@ -43,7 +43,7 @@ def recalculate_team_stats() -> None:
             if losses >= 2:
                 teams_df.loc[idx, "is_eliminated"] = True
                 
-    save_sheet("Teams", teams_df)
+    save_sheet("Teams", teams_df, _raw=True)
 
 
 def record_result(
@@ -94,14 +94,17 @@ def record_result(
     matches_df.loc[mask, "date_played"]  = str(date.today())
     matches_df.loc[mask, "team_a_score"] = int(team_a_score)
     matches_df.loc[mask, "team_b_score"] = int(team_b_score)
-    save_sheet("Matches", matches_df)
+    save_sheet("Matches", matches_df, _raw=True)
 
-    # Recalculate team stats
+    # Recalculate team stats (uses _raw=True internally)
     recalculate_team_stats()
 
-    # Advance bracket (import here to avoid circular imports at module level)
+    # Advance bracket — also uses _raw=True internally for any saves
     from modules.match_scheduler import advance_bracket
     advance_bracket(match_id)
+    # NOTE: The caller (UI) will follow up with save_match_awards() which does
+    # the final cache-bust + update_derived_sheets. If called standalone without
+    # awards, call st.cache_data.clear() + update_derived_sheets() manually.
 
 
 def save_match_awards(match_id: int, award_map: dict) -> None:
@@ -150,7 +153,7 @@ def save_match_awards(match_id: int, award_map: dict) -> None:
         new_df = pd.DataFrame(new_rows)
         ms_df  = pd.concat([ms_df, new_df], ignore_index=True)
 
-    save_sheet("MatchStats", ms_df)
+    save_sheet("MatchStats", ms_df, _raw=True)
 
     # Apply queen snatcher bonus: +5 points to the snatcher's team, capped at 24
     queen_pid = next(
@@ -177,7 +180,15 @@ def save_match_awards(match_id: int, award_map: dict) -> None:
                 else:
                     raw = int(matches_df.loc[m_mask, "team_b_score"].iloc[0])
                     matches_df.loc[m_mask, "team_b_score"] = min(raw + 5, 24)
-                save_sheet("Matches", matches_df)
+                save_sheet("Matches", matches_df, _raw=True)
+
+    # Final flush: one cache-bust + one derived-sheet recompute
+    try:
+        import streamlit as st
+        st.cache_data.clear()
+    except Exception:
+        pass
+    update_derived_sheets()
 
 
 def get_match_awards(match_id: int) -> pd.DataFrame:
@@ -227,7 +238,7 @@ def edit_match_result(
     matches_df.loc[mask, "loser_id"]     = loser_id
     matches_df.loc[mask, "team_a_score"] = max(0, min(int(team_a_score), 24))
     matches_df.loc[mask, "team_b_score"] = max(0, min(int(team_b_score), 24))
-    save_sheet("Matches", matches_df)
+    save_sheet("Matches", matches_df, _raw=True)
 
     if award_map:
         ms_df      = load_sheet("MatchStats")
@@ -256,7 +267,7 @@ def edit_match_result(
 
         if new_rows:
             ms_df = pd.concat([ms_df, pd.DataFrame(new_rows)], ignore_index=True)
-        save_sheet("MatchStats", ms_df)
+        save_sheet("MatchStats", ms_df, _raw=True)
 
     # Recalculate team stats
     recalculate_team_stats()
@@ -264,4 +275,12 @@ def edit_match_result(
     # Advance bracket in case of changes
     from modules.match_scheduler import advance_bracket
     advance_bracket(match_id)
+
+    # One final cache-bust + derived-sheet recompute
+    try:
+        import streamlit as st
+        st.cache_data.clear()
+    except Exception:
+        pass
+    update_derived_sheets()
 
