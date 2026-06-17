@@ -310,11 +310,20 @@ def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
                 # If included on INSERT it causes primary-key conflicts and silent failures.
                 r.pop("id", None)
                 for k, v in list(r.items()):
-                    if pd.isna(v):
-                        r[k] = None
-                    elif isinstance(v, (bool, int, float, str)):
+                    if v is None:
+                        continue
+                    try:
+                        if pd.isna(v):
+                            r[k] = None
+                            continue
+                    except (TypeError, ValueError):
                         pass
-                    else:
+                    # Pandas reads integer columns containing NaN as float64 from CSV
+                    # (e.g. 5.0 instead of 5). Supabase integer columns reject "5.0"
+                    # strings, so we must convert whole floats to int.
+                    if isinstance(v, float) and v == int(v):
+                        r[k] = int(v)
+                    elif not isinstance(v, (bool, int, float, str)):
                         r[k] = str(v)
             client.table(table_name).delete().eq("location", loc).execute()
             if records:
