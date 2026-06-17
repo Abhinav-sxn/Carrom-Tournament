@@ -245,7 +245,7 @@ def _load_from_supabase(sheet_name: str, location: str) -> pd.DataFrame | None:
 
 try:
     import streamlit as _st
-    _load_from_supabase = _st.cache_data(ttl=3, show_spinner=False)(_load_from_supabase)
+    _load_from_supabase = _st.cache_data(ttl=10, show_spinner=False)(_load_from_supabase)
 except Exception:
     pass
 
@@ -268,6 +268,27 @@ def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
         return pd.DataFrame(columns=expected_cols)
 
     return _load_csv_from_path(path, sheet_name)
+
+
+def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str, pd.DataFrame]:
+    """Load multiple sheets in parallel using a thread pool to optimize load times.
+
+    Returns a dict mapping sheet_name -> DataFrame.
+    """
+    import concurrent.futures
+    loc = location or _get_location()
+
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sheet_names), 6)) as executor:
+        futures = {executor.submit(load_sheet, sn, loc): sn for sn in sheet_names}
+        for future in concurrent.futures.as_completed(futures):
+            sn = futures[future]
+            try:
+                results[sn] = future.result()
+            except Exception as e:
+                print(f"Parallel load failed for {sn}: {e}")
+                results[sn] = pd.DataFrame(columns=SHEET_HEADERS.get(sn, []))
+    return results
 
 
 def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:

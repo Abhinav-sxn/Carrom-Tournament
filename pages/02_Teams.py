@@ -19,9 +19,11 @@ st.markdown("---")
 # ---------------------------------------------------------------------------
 # Load current state
 # ---------------------------------------------------------------------------
-players_df  = load_sheet("Players")
-teams_df    = load_sheet("Teams")
-matches_df  = load_sheet("Matches")
+from modules.excel_sync import load_sheets
+sheets = load_sheets(["Players", "Teams", "Matches"])
+players_df  = sheets["Players"]
+teams_df    = sheets["Teams"]
+matches_df  = sheets["Matches"]
 
 teams_exist    = not teams_df.empty
 matches_exist  = not matches_df.empty

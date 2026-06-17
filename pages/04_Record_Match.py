@@ -35,9 +35,11 @@ st.markdown("""
 # Load data for active sidebar location
 # ---------------------------------------------------------------------------
 loc = st.session_state.get("_location")
-matches_df  = load_sheet("Matches", location=loc)
-teams_df    = load_sheet("Teams", location=loc)
-players_df  = load_sheet("Players", location=loc)
+from modules.excel_sync import load_sheets
+sheets = load_sheets(["Matches", "Teams", "Players"], location=loc)
+matches_df  = sheets["Matches"]
+teams_df    = sheets["Teams"]
+players_df  = sheets["Players"]
 
 if matches_df.empty:
     st.warning("No matches scheduled yet. Go to **Schedule** to generate the bracket.")

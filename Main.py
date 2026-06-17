@@ -42,10 +42,12 @@ def _home():
         # Load data for the active location (explicit to avoid thread-local mismatches)
         # ---------------------------------------------------------------------------
         loc = st.session_state.get("_location", LOCATIONS[0])
-        players_df = load_sheet("Players", location=loc)
-        teams_df   = load_sheet("Teams", location=loc)
-        matches_df = load_sheet("Matches", location=loc)
-        ms_df      = load_sheet("MatchStats", location=loc)
+        from modules.excel_sync import load_sheets
+        sheets = load_sheets(["Players", "Teams", "Matches", "MatchStats"], location=loc)
+        players_df = sheets["Players"]
+        teams_df   = sheets["Teams"]
+        matches_df = sheets["Matches"]
+        ms_df      = sheets["MatchStats"]
 
         total_players  = len(players_df)
         total_teams    = len(teams_df)

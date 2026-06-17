@@ -22,9 +22,11 @@ st.markdown("---")
 # Load state for active sidebar location
 # ---------------------------------------------------------------------------
 loc = st.session_state.get("_location")
-teams_df   = load_sheet("Teams", location=loc)
-matches_df = load_sheet("Matches", location=loc)
-players_df = load_sheet("Players", location=loc)
+from modules.excel_sync import load_sheets
+sheets = load_sheets(["Teams", "Matches", "Players"], location=loc)
+teams_df   = sheets["Teams"]
+matches_df = sheets["Matches"]
+players_df = sheets["Players"]
 
 teams_exist   = not teams_df.empty
 matches_exist = not matches_df.empty

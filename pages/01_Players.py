@@ -25,8 +25,10 @@ def _reload():
 if "players_df" not in st.session_state:
     _reload()
 
-players_df = load_sheet("Players")
-teams_exist = not load_sheet("Teams").empty
+from modules.excel_sync import load_sheets
+sheets = load_sheets(["Players", "Teams"])
+players_df = sheets["Players"]
+teams_exist = not sheets["Teams"].empty
 teams_locked = teams_exist  # once teams are built, player list is locked
 
 # ---------------------------------------------------------------------------

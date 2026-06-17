@@ -18,10 +18,14 @@ st.markdown("---")
 @st.fragment(run_every=5)
 def render_leaderboard():
     # ---------------------------------------------------------------------------
-    # Load data
+    # Load data in parallel
     # ---------------------------------------------------------------------------
-    lb_df  = get_team_standings()
-    ps_df  = get_player_stats()
+    from modules.excel_sync import load_sheets
+    sheets = load_sheets(["Leaderboard", "PlayerStats", "Teams", "Matches"])
+    lb_df  = sheets["Leaderboard"]
+    ps_df  = sheets["PlayerStats"]
+    teams_df   = sheets["Teams"]
+    matches_df = sheets["Matches"]
     leaders = get_award_leaders()
 
     AWARD_LABELS = {
@@ -34,8 +38,6 @@ def render_leaderboard():
     # ---------------------------------------------------------------------------
     # Tournament champion banner (if complete)
     # ---------------------------------------------------------------------------
-    teams_df   = load_sheet("Teams")
-    matches_df = load_sheet("Matches")
 
     if not teams_df.empty and not matches_df.empty:
         finals_rows = matches_df[matches_df["bracket"].str.lower() == "finals"]
