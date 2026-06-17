@@ -32,11 +32,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Load data
+# Load data for active sidebar location
 # ---------------------------------------------------------------------------
-matches_df  = load_sheet("Matches")
-teams_df    = load_sheet("Teams")
-players_df  = load_sheet("Players")
+loc = st.session_state.get("_location")
+matches_df  = load_sheet("Matches", location=loc)
+teams_df    = load_sheet("Teams", location=loc)
+players_df  = load_sheet("Players", location=loc)
 
 if matches_df.empty:
     st.warning("No matches scheduled yet. Go to **Schedule** to generate the bracket.")

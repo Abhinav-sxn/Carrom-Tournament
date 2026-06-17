@@ -19,11 +19,12 @@ st.caption("Double-elimination pool play — top 2 by points fight for the champ
 st.markdown("---")
 
 # ---------------------------------------------------------------------------
-# Load state
+# Load state for active sidebar location
 # ---------------------------------------------------------------------------
-teams_df   = load_sheet("Teams")
-matches_df = load_sheet("Matches")
-players_df = load_sheet("Players")
+loc = st.session_state.get("_location")
+teams_df   = load_sheet("Teams", location=loc)
+matches_df = load_sheet("Matches", location=loc)
+players_df = load_sheet("Players", location=loc)
 
 teams_exist   = not teams_df.empty
 matches_exist = not matches_df.empty

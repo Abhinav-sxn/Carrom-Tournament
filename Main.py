@@ -37,12 +37,13 @@ def _home():
     init_workbook()    # creates location-specific CSV files if they don't exist
 
     # ---------------------------------------------------------------------------
-    # Load data
+    # Load data for the active location (explicit to avoid thread-local mismatches)
     # ---------------------------------------------------------------------------
-    players_df = load_sheet("Players")
-    teams_df   = load_sheet("Teams")
-    matches_df = load_sheet("Matches")
-    ms_df      = load_sheet("MatchStats")
+    loc = st.session_state.get("_location", LOCATIONS[0])
+    players_df = load_sheet("Players", location=loc)
+    teams_df   = load_sheet("Teams", location=loc)
+    matches_df = load_sheet("Matches", location=loc)
+    ms_df      = load_sheet("MatchStats", location=loc)
 
     total_players  = len(players_df)
     total_teams    = len(teams_df)
