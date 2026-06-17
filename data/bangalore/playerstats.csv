@@ -1,6 +1,6 @@
 player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_king,total_awards
 1,Kiran K Gajendragadkar,Team A,0,0,0,0,0
-2,Naveen Kalaivanan,Team F,0,0,0,0,0
+2,Naveen Kalaivanan,Team F,0,1,0,0,1
 3,Manoj Srinivas,Team G,0,0,0,0,0
 5,Harish Patnaik,Team H,0,0,0,0,0
 6,RaviTeja Mellamputi,Avengers,0,0,0,0,0
@@ -8,7 +8,7 @@ player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_k
 9,Sudeep Banerjee,Team A,0,0,0,0,0
 10,Prabhakar Gupta,Team E,0,0,0,0,0
 11,Vijaykumar Laxmappa Batavvanavar,Avengers,0,0,0,0,0
-12,Imran Syed,Team B,0,0,0,0,0
+12,Imran Syed,Team B,1,0,0,0,1
 13,Arun Kumar V,Team G,0,0,0,0,0
 14,Pradeep H Sreenath,Team H,0,0,0,0,0
 15,Shewag Bhattarai,Team J,0,0,0,0,0
@@ -17,5 +17,5 @@ player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_k
 18,Arnab Mondal,Team J,0,0,0,0,0
 19,Yogesh Mansingh,Strike Force,0,0,0,0,0
 20,Harsh Sonkar,Team E,0,0,0,0,0
-21,Vamsy Madugundu,Team F,0,0,0,0,0
+21,Vamsy Madugundu,Team F,0,0,1,0,1
 22,Ramesh Singh,Strike Force,0,0,0,0,0
