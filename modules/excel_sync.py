@@ -2,13 +2,12 @@
 excel_sync.py
 -------------
 Single source of truth for all data read/write operations.
-Data is stored as CSV files (one per sheet per location) under data/<location>/.
+Data is stored in Supabase (if configured) with secondary local CSV backup.
 
 All other modules call load_sheet() and save_sheet() — never deal with files directly.
 
-On every save_sheet() call the CSV is also committed to GitHub via github_sync so that
-data survives Streamlit Cloud container restarts.  Excel files are never stored on disk;
-use excel_export.generate_workbook_bytes() to produce an in-memory xlsx for download.
+Excel files are never stored on disk; use excel_export.generate_workbook_bytes()
+to produce an in-memory xlsx for download.
 
 Sheets:
   Players      — registered players with skill ratings
@@ -21,10 +20,8 @@ Sheets:
 
 from __future__ import annotations
 
-import io
 import os
 import threading
-import time
 import pandas as pd
 
 # ---------------------------------------------------------------------------
@@ -55,10 +52,7 @@ def _csv_path(sheet_name: str, location: str | None = None) -> str:
     return os.path.join(DATA_DIR, loc, f"{sheet_name.lower()}.csv")
 
 
-def _repo_path(sheet_name: str, location: str | None = None) -> str:
-    """GitHub repo-relative path for a sheet's CSV file."""
-    loc = (location or _get_location()).lower()
-    return f"data/{loc}/{sheet_name.lower()}.csv"
+
 
 # ---------------------------------------------------------------------------
 # Schema constants
@@ -109,129 +103,16 @@ def _ensure_data_dir(location: str | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Deferred GitHub push — dirty tracking + background thread
-# ---------------------------------------------------------------------------
-
-_dirty_sheets: set[tuple[str, str]] = set()  # (sheet_name, location)
-_dirty_lock   = threading.Lock()
-_bg_thread: threading.Thread | None = None
-_PUSH_INTERVAL = 300  # seconds between automatic background pushes
-
-
-def _mark_dirty(sheet_name: str) -> None:
-    """Flag a sheet+location pair as needing a GitHub push.
-    Location is captured from the current thread now, not at push time.
-    """
-    with _dirty_lock:
-        _dirty_sheets.add((sheet_name, _get_location()))
-
-
-def _bg_push_loop() -> None:
-    """Background daemon: push dirty sheets every _PUSH_INTERVAL seconds."""
-    while True:
-        time.sleep(_PUSH_INTERVAL)
-        sync_to_github()
-
-
-def _ensure_bg_thread() -> None:
-    global _bg_thread
-    if _bg_thread is None or not _bg_thread.is_alive():
-        t = threading.Thread(target=_bg_push_loop, daemon=True, name="github-sync")
-        t.start()
-        _bg_thread = t
-
-
-def sync_to_github(location: str | None = None) -> dict:
-    """Push dirty sheets to GitHub immediately.
-
-    If *location* is provided, only sheets for that location are pushed.
-    Safe to call from any thread — does not use st.session_state or st.warning.
-    Returns {"pushed": [..."location/sheet"...], "failed": [...]}.
-    """
-    with _dirty_lock:
-        items = list(_dirty_sheets)
-        # If a location was specified we only pop matching items from the
-        # dirty set; leave others queued for the background thread.
-        if location is None:
-            _dirty_sheets.clear()
-        else:
-            # remove only the matching entries
-            for it in list(_dirty_sheets):
-                if it[1] == location:
-                    _dirty_sheets.discard(it)
-
-    pushed: list[str] = []
-    failed: list[str] = []
-    for sheet_name, location in items:
-        path = _csv_path(sheet_name, location)       # use stored location
-        repo  = _repo_path(sheet_name, location)     # use stored location
-        if not os.path.exists(path):
-            continue
-        try:
-            df = pd.read_csv(path)
-            # Safety: avoid pushing an empty local sheet that would overwrite a
-            # non-empty remote sheet (this previously caused data loss when
-            # a temporary GitHub pull failed and an empty CSV was created).
-            from modules.github_sync import push_file, pull_file
-            local_csv = df.to_csv(index=False)
-            # If local appears empty (no rows), check remote first. If remote
-            # exists and is non-empty, skip pushing to avoid accidental overwrite.
-            if df.dropna(how="all").empty:
-                remote_content = pull_file(repo)
-                if remote_content is not None and remote_content.strip() != "":
-                    # Skip this push; remote has content but local is empty.
-                    failed.append(f"{location}/{sheet_name} (empty local, remote preserved)")
-                    continue
-            push_file(repo, local_csv, f"Sync {location}/{sheet_name}")
-            pushed.append(f"{location}/{sheet_name}")
-        except Exception:
-            failed.append(f"{location}/{sheet_name}")
-            with _dirty_lock:                       # re-queue with correct location
-                _dirty_sheets.add((sheet_name, location))
-
-    return {"pushed": pushed, "failed": failed}
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def init_data_store() -> None:
-    """On startup pull any missing CSVs from GitHub in parallel, then create empty
-    placeholders for any still absent.  Parallel fetches cut cold-start latency
-    from ~N×0.5 s (sequential) down to ~0.5 s total.
-    """
+    """On startup, ensure location-specific data directories and CSV files exist."""
     _ensure_data_dir()
-    missing = [
-        sn for sn in SHEET_HEADERS if not os.path.exists(_csv_path(sn))
-    ]
-
-    if missing:
-        import concurrent.futures
-
-        def _pull_one(sheet_name: str) -> None:
-            try:
-                from modules.github_sync import pull_file
-                content = pull_file(_repo_path(sheet_name))
-                if content:
-                    pd.read_csv(io.StringIO(content)).to_csv(
-                        _csv_path(sheet_name), index=False
-                    )
-                    return
-            except Exception:
-                pass
-            if not os.path.exists(_csv_path(sheet_name)):
-                pd.DataFrame(columns=SHEET_HEADERS[sheet_name]).to_csv(
-                    _csv_path(sheet_name), index=False
-                )
-
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(len(missing), 6)
-        ) as pool:
-            list(pool.map(_pull_one, missing))
-    else:
-        # All files present locally — nothing to do
-        pass
+    for sheet_name, headers in SHEET_HEADERS.items():
+        path = _csv_path(sheet_name)
+        if not os.path.exists(path):
+            pd.DataFrame(columns=headers).to_csv(path, index=False)
 
 
 # Keep backward-compatible alias used by Main.py
@@ -384,17 +265,7 @@ def load_sheet(sheet_name: str, location: str | None = None) -> pd.DataFrame:
     path = _csv_path(sheet_name, location)
 
     if not os.path.exists(path):
-        # Recovery path: pull from GitHub and write to disk, then fall through
-        try:
-            from modules.github_sync import pull_file
-            content = pull_file(_repo_path(sheet_name, location))
-            if content:
-                df = pd.read_csv(io.StringIO(content))
-                df.to_csv(path, index=False)
-        except Exception:
-            pass
-        if not os.path.exists(path):
-            return pd.DataFrame(columns=expected_cols)
+        return pd.DataFrame(columns=expected_cols)
 
     return _load_csv_from_path(path, sheet_name)
 
@@ -438,10 +309,7 @@ def save_sheet(sheet_name: str, df: pd.DataFrame) -> None:
     try:
         import streamlit as st
         st.cache_data.clear()
-        # GitHub push is only needed if not using Supabase
-        if not supabase_success and st.session_state.get("is_admin", False):
-            _mark_dirty(sheet_name)
-            _ensure_bg_thread()
+        pass
     except Exception:
         pass
 
@@ -474,7 +342,6 @@ def update_derived_sheets() -> None:
         pd.DataFrame(columns=SHEET_HEADERS["Leaderboard"]).to_csv(
             _csv_path("Leaderboard"), index=False
         )
-        _mark_dirty("Leaderboard")
     else:
         lb = teams_df[["team_id", "team_name", "wins", "losses", "is_eliminated"]].copy()
         lb["wins"]   = pd.to_numeric(lb["wins"],   errors="coerce").fillna(0).astype(int)
@@ -535,7 +402,6 @@ def update_derived_sheets() -> None:
         pd.DataFrame(columns=SHEET_HEADERS["PlayerStats"]).to_csv(
             _csv_path("PlayerStats"), index=False
         )
-        _mark_dirty("PlayerStats")
     else:
         ps = players_df[["player_id", "name", "team_id"]].copy()
 

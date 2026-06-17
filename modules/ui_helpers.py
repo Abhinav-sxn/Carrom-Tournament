@@ -459,21 +459,8 @@ def render_logo() -> None:
     except Exception:
         pass
 
-    # Admin actions (sync + cache clear)
+    # Admin actions (cache clear)
     if auth.is_admin():
-        from modules.excel_sync import sync_to_github
-
-        if st.sidebar.button("☁️ Sync to GitHub", key="sidebar_sync", width="stretch"):
-            # Only sync the currently selected location when the admin
-            # explicitly clicks the sidebar button — background thread
-            # will still push other locations on its schedule.
-            result = sync_to_github(st.session_state.get("_location"))
-            if result["pushed"]:
-                st.sidebar.success(f"✅ Synced {len(result['pushed'])} sheet(s) to GitHub")
-            elif result["failed"]:
-                st.sidebar.warning(f"⚠️ Sync failed for: {', '.join(result['failed'])}")
-            else:
-                st.sidebar.info("Nothing to sync — data is up to date")
 
         # Clear Streamlit caches + non-essential session state keys
         def _clear_app_cache():
