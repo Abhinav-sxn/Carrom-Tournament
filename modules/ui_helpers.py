@@ -421,7 +421,7 @@ def render_logo() -> None:
         st.session_state["_location"] = LOCATIONS[0]
 
     selected = st.sidebar.selectbox(
-        "\U0001f4cd Location",
+        "📍 Location",
         LOCATIONS,
         index=LOCATIONS.index(st.session_state["_location"]),
         key="_loc_select",
@@ -430,6 +430,37 @@ def render_logo() -> None:
         st.session_state["_location"] = selected
         st.rerun()
     set_location(st.session_state["_location"])
+
+    # Database status indicator
+    try:
+        from modules.excel_sync import get_db_status
+        db_info = get_db_status()
+        if db_info["status"] == "supabase":
+            st.sidebar.markdown(
+                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #10B981; font-weight: 500; display: flex; align-items: center; gap: 6px;'>"
+                f"<span style='height: 8px; width: 8px; background-color: #10B981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10B981;'></span>"
+                f"Database: Connected ({db_info['message']})"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        elif db_info["status"] == "error":
+            st.sidebar.markdown(
+                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #EF4444; font-weight: 500; display: flex; align-items: center; gap: 6px;'>"
+                f"<span style='height: 8px; width: 8px; background-color: #EF4444; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #EF4444;'></span>"
+                f"Database Error: credentials failed"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.sidebar.markdown(
+                f"<div style='font-size: 0.82rem; margin-top: -10px; margin-bottom: 15px; color: #8892B0; font-weight: 500; display: flex; align-items: center; gap: 6px;'>"
+                f"<span style='height: 8px; width: 8px; background-color: #8892B0; border-radius: 50%; display: inline-block;'></span>"
+                f"Database: {db_info['message']}"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+    except Exception:
+        pass
 
     # Admin login (shows unlock widget in the sidebar)
     try:

@@ -295,6 +295,37 @@ def _get_supabase_client():
     return None
 
 
+def _check_supabase_connection(url: str, key: str) -> dict:
+    try:
+        from supabase import create_client
+        client = create_client(url, key)
+        # Select a single row from players table to check read access
+        client.table("players").select("player_id").limit(1).execute()
+        return {"status": "supabase", "message": "Supabase Cloud"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+try:
+    import streamlit as _st
+    _check_supabase_connection = _st.cache_data(ttl=10, show_spinner=False)(_check_supabase_connection)
+except Exception:
+    pass
+
+
+def get_db_status() -> dict:
+    try:
+        import streamlit as st
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_KEY")
+        if url and key:
+            return _check_supabase_connection(url, key)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    return {"status": "local", "message": "Local CSV"}
+
+
+
 def _load_from_supabase(sheet_name: str, location: str) -> pd.DataFrame | None:
     client = _get_supabase_client()
     if client is None:
