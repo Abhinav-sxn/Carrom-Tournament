@@ -18,10 +18,13 @@ st.markdown("---")
 @st.fragment(run_every=5)
 def render_leaderboard():
     # ---------------------------------------------------------------------------
-    # Load data in parallel
+    # Load data in parallel — pass location explicitly so the auto-refresh
+    # thread always uses the user's selected location, not the thread default.
     # ---------------------------------------------------------------------------
-    from modules.excel_sync import load_sheets
-    sheets = load_sheets(["Leaderboard", "PlayerStats", "Teams", "Matches"])
+    from modules.excel_sync import load_sheets, set_location
+    loc = st.session_state.get("_location", "Bangalore")
+    set_location(loc)  # ensure this thread's _tls has the right location
+    sheets = load_sheets(["Leaderboard", "PlayerStats", "Teams", "Matches"], location=loc)
     lb_df  = sheets["Leaderboard"]
     ps_df  = sheets["PlayerStats"]
     teams_df   = sheets["Teams"]
@@ -94,6 +97,12 @@ def render_leaderboard():
                 "total_points": "Points",
                 "total_awards": "Awards",
             })
+            # Sort by Points DESC, then Wins DESC, then Losses ASC
+            display = display.sort_values(
+                ["Points", "Wins", "Losses"],
+                ascending=[False, False, True],
+            ).reset_index(drop=True)
+            display.insert(0, "Rank", range(1, len(display) + 1))
             display = display[["Rank", "Team", "Points", "Wins", "Losses", "Awards", "Status"]]
 
             render_df(
