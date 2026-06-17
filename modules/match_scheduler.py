@@ -140,7 +140,7 @@ def advance_bracket(completed_match_id: int) -> None:
                 bracket="finals",
             )]
             updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
-            save_sheet("Matches", updated, _raw=True)
+            save_sheet("Matches", updated, _skip_derived=True)
         return
 
     # Check if we are in a Finals Rematch (bracket reset: 0 undefeated, 2 one-loss)
@@ -158,7 +158,7 @@ def advance_bracket(completed_match_id: int) -> None:
                 bracket="finals",
             )]
             updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
-            save_sheet("Matches", updated, _raw=True)
+            save_sheet("Matches", updated, _skip_derived=True)
         return
 
     # Otherwise, we have a normal bracket round
@@ -236,9 +236,9 @@ def advance_bracket(completed_match_id: int) -> None:
             )
 
     if new_matches:
-        save_sheet("Teams", teams_df, _raw=True)
+        save_sheet("Teams", teams_df, _skip_derived=True)
         updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
-        save_sheet("Matches", updated, _raw=True)
+        save_sheet("Matches", updated, _skip_derived=True)
 
 
 def schedule_finals_by_points() -> None:

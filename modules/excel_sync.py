@@ -322,23 +322,21 @@ def _save_raw(sheet_name: str, df: pd.DataFrame, loc: str) -> None:
         pass
 
 
-def save_sheet(sheet_name: str, df: pd.DataFrame, _raw: bool = False) -> None:
+def save_sheet(sheet_name: str, df: pd.DataFrame, _skip_derived: bool = False) -> None:
     """Save a sheet to Supabase (if configured) or fallback to its CSV file.
 
-    Pass _raw=True from within a pipeline of saves to skip the cache-clear and
-    derived-sheet recomputation for that individual call.  The caller is then
-    responsible for calling update_derived_sheets() + st.cache_data.clear() once
-    at the very end, avoiding the O(n) cascade of redundant network trips.
+    Pass _skip_derived=True from within a pipeline of saves to defer the
+    derived-sheet recomputation (Leaderboard, PlayerStats) to the very end.
+    The cache is ALWAYS cleared so that subsequent load_sheet() calls within
+    the same pipeline get fresh data — skipping this would cause stale reads
+    that overwrite the records we just wrote.
     """
     loc = _get_location().lower()
 
     # Persist to Supabase + local CSV
     _save_raw(sheet_name, df, loc)
 
-    if _raw:
-        return  # Caller handles cache-bust and derived updates
-
-    # Bust Streamlit caches AFTER the write has completed
+    # Always bust Streamlit caches so subsequent load_sheet() calls see fresh data.
     try:
         import streamlit as st
         st.cache_data.clear()
@@ -346,8 +344,8 @@ def save_sheet(sheet_name: str, df: pd.DataFrame, _raw: bool = False) -> None:
         pass
 
     # Update derived sheets (Leaderboard, PlayerStats) when source data changes.
-    # These use _save_raw internally to avoid recursing back into save_sheet.
-    if sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
+    # Skip this if the caller will trigger it once at the end of a pipeline.
+    if not _skip_derived and sheet_name in ("Players", "Teams", "Matches", "MatchStats"):
         update_derived_sheets()
 
 
