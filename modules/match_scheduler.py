@@ -144,23 +144,41 @@ def advance_bracket(completed_match_id: int) -> None:
     undefeated = active[active["losses"] == 0].reset_index(drop=True)
     one_loss   = active[active["losses"] == 1].reset_index(drop=True)
 
-    # Check if we are in the Finals (1 undefeated, 1 one-loss)
-    if len(undefeated) == 1 and len(one_loss) == 1:
-        # Check if we have already scheduled a finals match for this round
-        finals_scheduled = matches_df[
-            (matches_df["bracket"] == "finals") &
-            (matches_df["round"] == next_round)
-        ]
+    # Check if we are ready for the Finals (bracket stage completed)
+    if len(undefeated) <= 1 and len(one_loss) <= 1:
+        # Get the top 2 teams from the leaderboard (ignoring elimination status)
+        leaderboard_df = load_sheet("Leaderboard")
+        if not leaderboard_df.empty and len(leaderboard_df) >= 2:
+            team_a_id = int(leaderboard_df.iloc[0]["team_id"])
+            team_b_id = int(leaderboard_df.iloc[1]["team_id"])
+        else:
+            # Fallback if leaderboard is somehow missing
+            team_a_id = int(undefeated.iloc[0]["team_id"]) if not undefeated.empty else int(active.iloc[0]["team_id"])
+            team_b_id = int(one_loss.iloc[0]["team_id"]) if not one_loss.empty else int(active.iloc[1]["team_id"])
+
+        # Check if we have already scheduled a finals match
+        finals_scheduled = matches_df[matches_df["bracket"] == "finals"]
+        
         if finals_scheduled.empty:
             new_matches = [_make_match(
                 match_id=get_next_id("Matches", "match_id"),
                 round_num=next_round,
-                team_a_id=int(undefeated.iloc[0]["team_id"]),
-                team_b_id=int(one_loss.iloc[0]["team_id"]),
+                team_a_id=team_a_id,
+                team_b_id=team_b_id,
                 bracket="finals",
             )]
             updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
             save_sheet("Matches", updated, _skip_derived=True)
+        else:
+            # If scheduled but not yet played, ensure it has the correct top 2 teams
+            finals_idx = finals_scheduled.index[-1]
+            if str(matches_df.loc[finals_idx, "status"]) == "scheduled":
+                curr_a = matches_df.loc[finals_idx, "team_a_id"]
+                curr_b = matches_df.loc[finals_idx, "team_b_id"]
+                if pd.isna(curr_a) or pd.isna(curr_b) or int(curr_a) != team_a_id or int(curr_b) != team_b_id:
+                    matches_df.loc[finals_idx, "team_a_id"] = team_a_id
+                    matches_df.loc[finals_idx, "team_b_id"] = team_b_id
+                    save_sheet("Matches", matches_df, _skip_derived=True)
         return
 
     # Otherwise, we have a normal bracket round

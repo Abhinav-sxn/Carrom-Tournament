@@ -189,6 +189,12 @@ def save_match_awards(match_id: int, award_map: dict) -> None:
     except Exception:
         pass
     update_derived_sheets()
+    
+    # We call advance_bracket here to ensure the finals match is created/updated
+    # with the correct top 2 teams AFTER the queen bonus has been applied.
+    from modules.match_scheduler import advance_bracket
+    advance_bracket(match_id)
+
     # Clear the pipeline write cache so the next page load reads from Supabase
     from modules.excel_sync import _pc_clear
     _pc_clear()
@@ -275,10 +281,6 @@ def edit_match_result(
     # Recalculate team stats
     recalculate_team_stats()
 
-    # Advance bracket in case of changes
-    from modules.match_scheduler import advance_bracket
-    advance_bracket(match_id)
-
     # One final cache-bust + derived-sheet recompute
     try:
         import streamlit as st
@@ -286,4 +288,12 @@ def edit_match_result(
     except Exception:
         pass
     update_derived_sheets()
+
+    # Advance bracket in case of changes, after the leaderboard is updated
+    from modules.match_scheduler import advance_bracket
+    advance_bracket(match_id)
+
+    # Clear the pipeline write cache so the next page load reads from Supabase
+    from modules.excel_sync import _pc_clear
+    _pc_clear()
 
