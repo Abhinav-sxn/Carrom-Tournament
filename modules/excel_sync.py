@@ -39,12 +39,23 @@ _tls = threading.local()
 
 def _get_location() -> str:
     """Return the active location for the current thread, defaulting to LOCATIONS[0]."""
+    try:
+        import streamlit as st
+        if "_location" in st.session_state:
+            return st.session_state["_location"]
+    except Exception:
+        pass
     return getattr(_tls, "active_location", LOCATIONS[0])
 
 
 def set_location(loc: str) -> None:
     """Switch active location for this thread only — other sessions are unaffected."""
     _tls.active_location = loc
+    try:
+        import streamlit as st
+        st.session_state["_location"] = loc
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -443,7 +454,9 @@ def load_sheets(sheet_names: list[str], location: str | None = None) -> dict[str
 
     # Check cache first on the main thread
     for sn in sheet_names:
-        cached = _pc_get(sn, loc) or _get_session_cache(sn, loc)
+        cached = _pc_get(sn, loc)
+        if cached is None:
+            cached = _get_session_cache(sn, loc)
         if cached is not None:
             results[sn] = cached
         else:
