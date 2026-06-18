@@ -7,7 +7,8 @@ Bracket logic:
   After R1 : Winners stay in Winners bracket; losers drop to Losers bracket.
   Losers bracket: Each team gets exactly ONE rematch. Win it → re-enter main pool.
                   Lose it (2 losses total) → eliminated. No further losers matches.
-  Finals   : Last 2 active teams meet.
+  Finals   : Last 2 active teams meet. Single match — no rematch.
+             The winner is champion; the loser is eliminated immediately.
 
 advance_bracket() is called automatically by match_recorder after every result.
 """
@@ -118,17 +119,36 @@ def advance_bracket(completed_match_id: int) -> None:
     if len(active) <= 1:
         return  # Tournament complete - champion determined!
 
-    undefeated = active[active["losses"] == 0].reset_index(drop=True)
-    one_loss   = active[active["losses"] == 1].reset_index(drop=True)
-
     done = matches_df[matches_df["status"] == "done"]
     next_round = int(done["round"].max()) + 1 if not done.empty else 1
+
+    # If a Finals match has already been played, the tournament is over.
+    # The Finals is a single definitive match — no rematch.
+    # Eliminate the loser unconditionally (they may only have 1 loss if they
+    # were undefeated going in, so recalculate_team_stats won't catch them).
+    finals_done = matches_df[
+        (matches_df["bracket"] == "finals") &
+        (matches_df["status"] == "done")
+    ]
+    if not finals_done.empty:
+        last_final = finals_done.sort_values("match_id").iloc[-1]
+        loser_id = last_final.get("loser_id")
+        if pd.notna(loser_id):
+            loser_id = int(loser_id)
+            loser_row = teams_df[teams_df["team_id"] == loser_id]
+            if not loser_row.empty and not _is_eliminated(loser_row.iloc[0]["is_eliminated"]):
+                teams_df.loc[teams_df["team_id"] == loser_id, "is_eliminated"] = True
+                save_sheet("Teams", teams_df, _skip_derived=True)
+        return  # Tournament complete — no further matches.
+
+    undefeated = active[active["losses"] == 0].reset_index(drop=True)
+    one_loss   = active[active["losses"] == 1].reset_index(drop=True)
 
     # Check if we are in the Finals (1 undefeated, 1 one-loss)
     if len(undefeated) == 1 and len(one_loss) == 1:
         # Check if we have already scheduled a finals match for this round
         finals_scheduled = matches_df[
-            (matches_df["bracket"] == "finals") & 
+            (matches_df["bracket"] == "finals") &
             (matches_df["round"] == next_round)
         ]
         if finals_scheduled.empty:
@@ -137,24 +157,6 @@ def advance_bracket(completed_match_id: int) -> None:
                 round_num=next_round,
                 team_a_id=int(undefeated.iloc[0]["team_id"]),
                 team_b_id=int(one_loss.iloc[0]["team_id"]),
-                bracket="finals",
-            )]
-            updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
-            save_sheet("Matches", updated, _skip_derived=True)
-        return
-
-    # Check if we are in a Finals Rematch (bracket reset: 0 undefeated, 2 one-loss)
-    if len(undefeated) == 0 and len(one_loss) == 2:
-        finals_scheduled = matches_df[
-            (matches_df["bracket"] == "finals") & 
-            (matches_df["round"] == next_round)
-        ]
-        if finals_scheduled.empty:
-            new_matches = [_make_match(
-                match_id=get_next_id("Matches", "match_id"),
-                round_num=next_round,
-                team_a_id=int(one_loss.iloc[0]["team_id"]),
-                team_b_id=int(one_loss.iloc[1]["team_id"]),
                 bracket="finals",
             )]
             updated = pd.concat([matches_df, pd.DataFrame(new_matches)], ignore_index=True)
