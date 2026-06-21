@@ -29,7 +29,7 @@ def recalculate_team_stats() -> None:
     teams_df["losses"] = 0
     teams_df["is_eliminated"] = False
 
-    completed = matches_df[matches_df["status"].isin(["done", "bye"])]
+    completed = matches_df[matches_df["status"] == "done"]
     if not completed.empty:
         win_counts = completed["winner_id"].dropna().astype(int).value_counts().to_dict()
         loss_counts = completed["loser_id"].dropna().astype(int).value_counts().to_dict()

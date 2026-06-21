@@ -179,8 +179,8 @@ for _, row in display_df.iterrows():
 
     if status == "bye":
         col_match.markdown(f"{team_a} — <em>bye (auto-win)</em>", unsafe_allow_html=True)
-        col_status.markdown(STATUS_BADGE["bye"])
-        col_winner.markdown(f"{team_a}", unsafe_allow_html=True)
+        col_status.markdown("—")
+        col_winner.markdown("—")
     elif status == "done":
         sa = row.get("team_a_score", None)
         sb = row.get("team_b_score", None)

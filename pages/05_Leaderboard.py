@@ -180,7 +180,7 @@ def render_leaderboard():
         if matches_df.empty:
             st.info("No matches played yet.")
         else:
-            done = matches_df[matches_df["status"].isin(["done", "bye"])].copy()
+            done = matches_df[matches_df["status"] == "done"].copy()
             if done.empty:
                 st.info("No completed matches yet.")
             else:

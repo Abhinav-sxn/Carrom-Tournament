@@ -75,11 +75,8 @@ def generate_schedule() -> pd.DataFrame:
             "scheduled_time": None,
             "date_played": None,
         })
-        # Grant the bye win
-        teams_df.loc[teams_df["team_id"] == bye_id, "wins"] = (
-            teams_df.loc[teams_df["team_id"] == bye_id, "wins"].fillna(0).astype(int) + 1
-        )
-        save_sheet("Teams", teams_df)
+        # No bye win is granted to teams_df['wins']
+        pass
 
     matches_df = pd.DataFrame(new_matches)
     save_sheet("Matches", matches_df)
@@ -215,10 +212,8 @@ def advance_bracket(completed_match_id: int) -> None:
                 "team_a_score": None,
                 "team_b_score": None,
             })
-            # Grant bye win
-            teams_df.loc[teams_df["team_id"] == bye_team, "wins"] = (
-                teams_df.loc[teams_df["team_id"] == bye_team, "wins"].fillna(0).astype(int) + 1
-            )
+            # No bye win is granted to teams_df['wins']
+            pass
 
     # 2. Losers Bracket Pairing (1-loss teams)
     l_teams = list(one_loss["team_id"].astype(int))
@@ -250,10 +245,8 @@ def advance_bracket(completed_match_id: int) -> None:
                 "team_a_score": None,
                 "team_b_score": None,
             })
-            # Grant bye win
-            teams_df.loc[teams_df["team_id"] == bye_team, "wins"] = (
-                teams_df.loc[teams_df["team_id"] == bye_team, "wins"].fillna(0).astype(int) + 1
-            )
+            # No bye win is granted to teams_df['wins']
+            pass
 
     if new_matches:
         save_sheet("Teams", teams_df, _skip_derived=True)
