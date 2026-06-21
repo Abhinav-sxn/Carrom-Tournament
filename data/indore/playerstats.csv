@@ -1,9 +1,9 @@
 player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_king,total_awards
 1,Sandeep Bhargava,Board Blaster,0,0,0,0,0
-2,Samir N Sahare,Royal Strikers,0,0,0,0,0
+2,Samir N Sahare,Royal Strikers,0,0,1,0,1
 3,Sachin Mishra,Carrom Warriors,0,0,0,0,0
 4,Pramod Mishra,Carrom Warriors,0,0,0,0,0
-5,Nitesh Gokhe,Royal Strikers,0,0,0,0,0
+5,Nitesh Gokhe,Royal Strikers,0,0,0,1,1
 6,Shailendra Malviya,Pocket Legends,0,0,0,0,0
 7,Bharat Chandel,Invincibles,0,0,0,0,0
 8,Shri Pachori,Mavericks,0,0,0,0,0
@@ -12,9 +12,9 @@ player_id,name,team_name,queen_snatcher,precision_player,best_striker,comeback_k
 11,Aayush Duby,Carrom Crushers,0,0,0,0,0
 12,Ved Prakash Vishwakarma,Infinity,0,0,0,0,0
 13,Lokendra Meena,Invincibles,0,0,0,0,0
-14,Hareesh Soni,Alpha Wolves,0,0,0,0,0
+14,Hareesh Soni,Alpha Wolves,0,1,0,0,1
 15,Prateek Kumar,Thunders,0,0,0,0,0
-16,Kamlesh Dhamwani,Alpha Wolves,0,0,0,0,0
+16,Kamlesh Dhamwani,Alpha Wolves,1,0,0,0,1
 17,Aishwarya Jain,Carrom Crushers,0,0,0,0,0
 18,Aklesh Upadhyay,Pocket Legends,0,0,0,0,0
 19,Vivek Sharma,Thunders,0,0,0,0,0
