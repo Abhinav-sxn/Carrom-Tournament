@@ -184,6 +184,14 @@ def advance_bracket(completed_match_id: int) -> None:
 
     # 1. Winners Bracket Pairing (undefeated teams)
     w_teams = list(undefeated["team_id"].astype(int))
+    bye_team_w = None
+    
+    # If odd number of undefeated teams, choose one to get a bye
+    if len(w_teams) % 2 == 1:
+        bye_team_w = _choose_bye(undefeated)
+        if bye_team_w is not None:
+            w_teams.remove(bye_team_w)
+
     for i in range(0, len(w_teams) - 1, 2):
         new_matches.append(_make_match(
             match_id=base_id + len(new_matches),
@@ -193,30 +201,35 @@ def advance_bracket(completed_match_id: int) -> None:
             bracket="winners",
         ))
 
-    # If odd number of undefeated teams, choose one to get a bye
-    if len(w_teams) % 2 == 1:
-        bye_team = _choose_bye(undefeated)
-        if bye_team is not None:
-            new_matches.append({
-                "match_id": base_id + len(new_matches),
-                "round": next_round,
-                "team_a_id": bye_team,
-                "team_b_id": None,
-                "winner_id": bye_team,
-                "loser_id": None,
-                "bracket": "winners",
-                "status": "bye",
-                "scheduled_date": None,
-                "scheduled_time": None,
-                "date_played": None,
-                "team_a_score": None,
-                "team_b_score": None,
-            })
-            # No bye win is granted to teams_df['wins']
-            pass
+    if bye_team_w is not None:
+        new_matches.append({
+            "match_id": base_id + len(new_matches),
+            "round": next_round,
+            "team_a_id": bye_team_w,
+            "team_b_id": None,
+            "winner_id": bye_team_w,
+            "loser_id": None,
+            "bracket": "winners",
+            "status": "bye",
+            "scheduled_date": None,
+            "scheduled_time": None,
+            "date_played": None,
+            "team_a_score": None,
+            "team_b_score": None,
+        })
+        # No bye win is granted to teams_df['wins']
+        pass
 
     # 2. Losers Bracket Pairing (1-loss teams)
     l_teams = list(one_loss["team_id"].astype(int))
+    bye_team_l = None
+
+    # If odd number of 1-loss teams, choose one to get a bye
+    if len(l_teams) % 2 == 1:
+        bye_team_l = _choose_bye(one_loss)
+        if bye_team_l is not None:
+            l_teams.remove(bye_team_l)
+
     for i in range(0, len(l_teams) - 1, 2):
         new_matches.append(_make_match(
             match_id=base_id + len(new_matches),
@@ -226,27 +239,24 @@ def advance_bracket(completed_match_id: int) -> None:
             bracket="losers",
         ))
 
-    # If odd number of 1-loss teams, choose one to get a bye
-    if len(l_teams) % 2 == 1:
-        bye_team = _choose_bye(one_loss)
-        if bye_team is not None:
-            new_matches.append({
-                "match_id": base_id + len(new_matches),
-                "round": next_round,
-                "team_a_id": bye_team,
-                "team_b_id": None,
-                "winner_id": bye_team,
-                "loser_id": None,
-                "bracket": "losers",
-                "status": "bye",
-                "scheduled_date": None,
-                "scheduled_time": None,
-                "date_played": None,
-                "team_a_score": None,
-                "team_b_score": None,
-            })
-            # No bye win is granted to teams_df['wins']
-            pass
+    if bye_team_l is not None:
+        new_matches.append({
+            "match_id": base_id + len(new_matches),
+            "round": next_round,
+            "team_a_id": bye_team_l,
+            "team_b_id": None,
+            "winner_id": bye_team_l,
+            "loser_id": None,
+            "bracket": "losers",
+            "status": "bye",
+            "scheduled_date": None,
+            "scheduled_time": None,
+            "date_played": None,
+            "team_a_score": None,
+            "team_b_score": None,
+        })
+        # No bye win is granted to teams_df['wins']
+        pass
 
     if new_matches:
         save_sheet("Teams", teams_df, _skip_derived=True)
