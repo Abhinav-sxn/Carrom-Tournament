@@ -13,3 +13,5 @@ player_id,name,skill_rating,team_id,partner_pref
 12,Saiprashanth Pulisetti,3,3,
 13,Prahalad,8,2,
 14,Vasudeva Rao Gauji,4,7,
+15,Bokhari Syed,5,8,Rashed Syed
+16,Rashed Syed,5,8,Bokhari Syed

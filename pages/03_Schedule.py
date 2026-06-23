@@ -324,6 +324,127 @@ else:
             )
 
 # ---------------------------------------------------------------------------
+# Adjust Match Pairings (admin)
+# ---------------------------------------------------------------------------
+if auth.is_admin() and matches_exist:
+    st.markdown("---")
+    with st.expander("🔀 Adjust Match Pairings"):
+        st.subheader("Swap Match Teams")
+        st.markdown(
+            "Select a round and bracket, pick two scheduled matches, and choose which teams to swap."
+        )
+        
+        # Filter matches that are "scheduled" or "in_progress" (not 'bye', not 'done')
+        pending_matches = matches_df[matches_df["status"].isin(["scheduled", "in_progress"])].copy()
+        
+        if len(pending_matches) < 2:
+            st.info("Need at least 2 scheduled or in-progress matches to adjust pairings.")
+        else:
+            # Group by (bracket, round)
+            groups = []
+            for (br, rd), grp in pending_matches.groupby(["bracket", "round"]):
+                if len(grp) >= 2:
+                    groups.append((br, rd))
+            
+            if not groups:
+                st.info("No round has 2 or more scheduled/in-progress matches to swap.")
+            else:
+                # Let user select bracket/round
+                group_options = [f"{br.title()} - Round {rd}" for br, rd in groups]
+                selected_group_idx = st.selectbox(
+                    "Select Round & Bracket",
+                    range(len(group_options)),
+                    format_func=lambda idx: group_options[idx],
+                    key="swap_group_select"
+                )
+                br, rd = groups[selected_group_idx]
+                
+                # Get matches for selected group
+                group_matches = pending_matches[
+                    (pending_matches["bracket"] == br) & (pending_matches["round"] == rd)
+                ].copy()
+                
+                # Format labels
+                def _match_label(row):
+                    m_id = int(row.match_id)
+                    ta = team_name.get(int(row.team_a_id), f"Team {row.team_a_id}") if pd.notna(row.team_a_id) else "—"
+                    tb = team_name.get(int(row.team_b_id), f"Team {row.team_b_id}") if pd.notna(row.team_b_id) else "—"
+                    return f"Match {m_id}: {ta} vs {tb}"
+                
+                match_list = list(group_matches.itertuples())
+                match_options = [(_match_label(m), m.match_id) for m in match_list]
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    m1_label, m1_id = st.selectbox(
+                        "Match 1",
+                        match_options,
+                        format_func=lambda x: x[0],
+                        key="swap_match_1"
+                    )
+                    # Load the actual row
+                    row1 = group_matches[group_matches["match_id"] == m1_id].iloc[0]
+                    t1_a_id = row1["team_a_id"]
+                    t1_b_id = row1["team_b_id"]
+                    
+                    t1_a_name = team_name.get(int(t1_a_id), f"Team {t1_a_id}") if pd.notna(t1_a_id) else "—"
+                    t1_b_name = team_name.get(int(t1_b_id), f"Team {t1_b_id}") if pd.notna(t1_b_id) else "—"
+                    
+                    swap_slot_1 = st.selectbox(
+                        "Swap which team from Match 1?",
+                        [("team_a_id", t1_a_name), ("team_b_id", t1_b_name)],
+                        format_func=lambda x: f"Slot A: {x[1]}" if x[0] == "team_a_id" else f"Slot B: {x[1]}",
+                        key="swap_slot_1"
+                    )
+                with col2:
+                    # Filter out Match 1 from Match 2 options
+                    m2_options = [opt for opt in match_options if opt[1] != m1_id]
+                    if m2_options:
+                        m2_label, m2_id = st.selectbox(
+                            "Match 2",
+                            m2_options,
+                            format_func=lambda x: x[0],
+                            key="swap_match_2"
+                        )
+                        # Load the actual row
+                        row2 = group_matches[group_matches["match_id"] == m2_id].iloc[0]
+                        t2_a_id = row2["team_a_id"]
+                        t2_b_id = row2["team_b_id"]
+                        
+                        t2_a_name = team_name.get(int(t2_a_id), f"Team {t2_a_id}") if pd.notna(t2_a_id) else "—"
+                        t2_b_name = team_name.get(int(t2_b_id), f"Team {t2_b_id}") if pd.notna(t2_b_id) else "—"
+                        
+                        swap_slot_2 = st.selectbox(
+                            "Swap with which team from Match 2?",
+                            [("team_a_id", t2_a_name), ("team_b_id", t2_b_name)],
+                            format_func=lambda x: f"Slot A: {x[1]}" if x[0] == "team_a_id" else f"Slot B: {x[1]}",
+                            key="swap_slot_2"
+                        )
+                    else:
+                        m2_id = None
+                
+                if m2_id is not None:
+                    if st.button("🔀 Swap Selected Teams", type="primary", use_container_width=True):
+                        # Find indices in matches_df
+                        idx1 = matches_df[matches_df["match_id"] == m1_id].index[0]
+                        idx2 = matches_df[matches_df["match_id"] == m2_id].index[0]
+                        
+                        slot1_col = swap_slot_1[0]  # "team_a_id" or "team_b_id"
+                        slot2_col = swap_slot_2[0]  # "team_a_id" or "team_b_id"
+                        
+                        val1 = matches_df.loc[idx1, slot1_col]
+                        val2 = matches_df.loc[idx2, slot2_col]
+                        
+                        # Swap
+                        matches_df.loc[idx1, slot1_col] = val2
+                        matches_df.loc[idx2, slot2_col] = val1
+                        
+                        from modules.excel_sync import save_sheet
+                        save_sheet("Matches", matches_df)
+                        st.success(f"Successfully swapped team '{swap_slot_1[1]}' and team '{swap_slot_2[1]}'!")
+                        st.rerun()
+
+# ---------------------------------------------------------------------------
 # Reset bracket (admin)
 # ---------------------------------------------------------------------------
 st.markdown("---")
