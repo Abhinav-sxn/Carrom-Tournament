@@ -19,10 +19,6 @@ stat_id,match_id,player_id,team_id,queen_snatcher,precision_player,best_striker,
 54,5,17,3,False,False,True,False
 55,5,9,10,False,False,False,True
 56,5,12,10,False,True,False,False
-61,7,15,9,False,False,False,False
-62,7,16,9,False,False,False,False
-63,7,7,4,False,False,False,False
-64,7,13,4,False,False,False,False
 73,9,6,5,False,True,False,False
 74,9,18,5,False,False,False,True
 75,9,3,7,False,False,True,False

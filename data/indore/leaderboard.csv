@@ -3,9 +3,9 @@ rank,team_id,team_name,wins,losses,status,total_points,total_awards
 2,7,Carrom Warriors,1,1,Active,25,4
 3,2,Thunders,1,1,Active,23,4
 4,1,Mavericks,1,0,Active,18,2
-5,4,Invincibles,1,1,Active,14,2
+5,4,Invincibles,1,0,Active,14,2
 6,5,Pocket Legends,0,2,Eliminated,14,3
-7,9,Alpha Wolves,2,0,Active,12,2
+7,9,Alpha Wolves,1,0,Active,12,2
 8,3,Carrom Crushers,0,1,Active,11,1
 9,6,Royal Strikers,0,1,Active,11,2
 10,8,Board Blaster,0,1,Active,5,2
