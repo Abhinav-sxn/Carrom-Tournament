@@ -94,6 +94,78 @@ def _choose_bye(df_group: pd.DataFrame) -> int | None:
     return int(df.iloc[0]["team_id"])
 
 
+def _choose_weakest_winner(df_group: pd.DataFrame, matches_df: pd.DataFrame) -> int | None:
+    if df_group.empty:
+        return None
+    # For each undefeated team, find their most recent completed match in matches_df
+    # Calculate score difference (absolute).
+    # Sort undefeated teams by this difference ascending.
+    # Tiebreakers: lowest avg_skill (ascending) then team_id (ascending) to be consistent.
+    teams_diffs = []
+    for idx, row in df_group.iterrows():
+        tid = int(row["team_id"])
+        # Find completed matches where tid was a participant
+        tid_matches = matches_df[
+            (matches_df["status"] == "done") & 
+            ((pd.to_numeric(matches_df["team_a_id"], errors="coerce") == tid) | 
+             (pd.to_numeric(matches_df["team_b_id"], errors="coerce") == tid))
+        ]
+        if not tid_matches.empty:
+            last_match = tid_matches.sort_values(["round", "match_id"], ascending=[False, False]).iloc[0]
+            sa = float(last_match.get("team_a_score", 0))
+            sb = float(last_match.get("team_b_score", 0))
+            diff = abs(sa - sb)
+        else:
+            diff = 0  # Fallback if no match played/completed yet (unproven = weakest)
+            
+        teams_diffs.append({
+            "team_id": tid,
+            "diff": diff,
+            "avg_skill": float(row.get("avg_skill", 0))
+        })
+        
+    df_diffs = pd.DataFrame(teams_diffs)
+    df_diffs = df_diffs.sort_values(["diff", "avg_skill", "team_id"], ascending=[True, True, True])
+    return int(df_diffs.iloc[0]["team_id"])
+
+
+def _choose_strongest_loser(df_group: pd.DataFrame, matches_df: pd.DataFrame) -> int | None:
+    if df_group.empty:
+        return None
+    # For each 1-loss team, find their most recent completed match in matches_df
+    # Get their score in that match.
+    # Sort one-loss teams by their score descending (highest score first).
+    # Tiebreakers: highest avg_skill (descending) then team_id (ascending).
+    teams_scores = []
+    for idx, row in df_group.iterrows():
+        tid = int(row["team_id"])
+        # Find completed matches where tid was a participant
+        tid_matches = matches_df[
+            (matches_df["status"] == "done") & 
+            ((pd.to_numeric(matches_df["team_a_id"], errors="coerce") == tid) | 
+             (pd.to_numeric(matches_df["team_b_id"], errors="coerce") == tid))
+        ]
+        if not tid_matches.empty:
+            last_match = tid_matches.sort_values(["round", "match_id"], ascending=[False, False]).iloc[0]
+            if float(last_match["team_a_id"]) == tid:
+                score = float(last_match.get("team_a_score", 0))
+            else:
+                score = float(last_match.get("team_b_score", 0))
+        else:
+            score = 0  # Fallback if no match played/completed yet
+            
+        teams_scores.append({
+            "team_id": tid,
+            "score": score,
+            "avg_skill": float(row.get("avg_skill", 0))
+        })
+        
+    df_scores = pd.DataFrame(teams_scores)
+    df_scores = df_scores.sort_values(["score", "avg_skill", "team_id"], ascending=[False, False, True])
+    return int(df_scores.iloc[0]["team_id"])
+
+
+
 def advance_bracket(completed_match_id: int) -> None:
     """
     Called after a match result is recorded. Inspects the current bracket
@@ -181,14 +253,13 @@ def advance_bracket(completed_match_id: int) -> None:
     # Otherwise, we have a normal bracket round
     new_matches = []
     base_id = get_next_id("Matches", "match_id")
-
     # 1. Winners Bracket Pairing (undefeated teams)
     w_teams = list(undefeated["team_id"].astype(int))
     bye_team_w = None
     
     # If odd number of undefeated teams, choose one to get a bye
     if len(w_teams) % 2 == 1:
-        bye_team_w = _choose_bye(undefeated)
+        bye_team_w = _choose_weakest_winner(undefeated, matches_df)
         if bye_team_w is not None:
             w_teams.remove(bye_team_w)
 
@@ -201,6 +272,38 @@ def advance_bracket(completed_match_id: int) -> None:
             bracket="winners",
         ))
 
+    # 2. Losers Bracket Pairing (1-loss teams)
+    l_teams = list(one_loss["team_id"].astype(int))
+    bye_team_l = None
+
+    # If odd number of 1-loss teams, choose one to get a bye
+    if len(l_teams) % 2 == 1:
+        bye_team_l = _choose_strongest_loser(one_loss, matches_df)
+        if bye_team_l is not None:
+            l_teams.remove(bye_team_l)
+
+    for i in range(0, len(l_teams) - 1, 2):
+        new_matches.append(_make_match(
+            match_id=base_id + len(new_matches),
+            round_num=next_round,
+            team_a_id=l_teams[i],
+            team_b_id=l_teams[i + 1],
+            bracket="losers",
+        ))
+
+    # Crossover pairing if we have an odd team in both brackets
+    if bye_team_w is not None and bye_team_l is not None:
+        new_matches.append(_make_match(
+            match_id=base_id + len(new_matches),
+            round_num=next_round,
+            team_a_id=bye_team_w,
+            team_b_id=bye_team_l,
+            bracket="winners",
+        ))
+        bye_team_w = None
+        bye_team_l = None
+
+    # Fallback to standard byes if only one bracket has an odd team
     if bye_team_w is not None:
         new_matches.append({
             "match_id": base_id + len(new_matches),
@@ -217,27 +320,6 @@ def advance_bracket(completed_match_id: int) -> None:
             "team_a_score": None,
             "team_b_score": None,
         })
-        # No bye win is granted to teams_df['wins']
-        pass
-
-    # 2. Losers Bracket Pairing (1-loss teams)
-    l_teams = list(one_loss["team_id"].astype(int))
-    bye_team_l = None
-
-    # If odd number of 1-loss teams, choose one to get a bye
-    if len(l_teams) % 2 == 1:
-        bye_team_l = _choose_bye(one_loss)
-        if bye_team_l is not None:
-            l_teams.remove(bye_team_l)
-
-    for i in range(0, len(l_teams) - 1, 2):
-        new_matches.append(_make_match(
-            match_id=base_id + len(new_matches),
-            round_num=next_round,
-            team_a_id=l_teams[i],
-            team_b_id=l_teams[i + 1],
-            bracket="losers",
-        ))
 
     if bye_team_l is not None:
         new_matches.append({
@@ -255,8 +337,6 @@ def advance_bracket(completed_match_id: int) -> None:
             "team_a_score": None,
             "team_b_score": None,
         })
-        # No bye win is granted to teams_df['wins']
-        pass
 
     if new_matches:
         save_sheet("Teams", teams_df, _skip_derived=True)

@@ -1,11 +1,11 @@
 rank,team_id,team_name,wins,losses,status,total_points,total_awards
-1,2,Team B,1,0,Active,24,1
-2,5,Team E,1,0,Active,24,2
-3,10,Team J,1,0,Active,24,2
-4,6,Team F,0,1,Active,15,2
-5,8,Team H,0,1,Active,9,2
-6,3,Skill Force,0,1,Active,8,2
-7,1,Team A,0,0,Active,0,0
-8,4,Team D,0,0,Active,0,0
-9,7,Team G,0,0,Active,0,0
-10,9,Avengers,0,0,Active,0,0
+1,2,Queen Warriors,1,0,Active,24,1
+2,4,Queen Hunters,1,0,Active,24,2
+3,5,Team E,1,0,Active,24,2
+4,7,Team G,1,0,Active,24,1
+5,10,Team J,1,0,Active,24,2
+6,6,Team F,0,1,Active,15,2
+7,9,Avengers,0,1,Active,13,2
+8,8,Team H,0,1,Active,9,2
+9,3,Strike Force,0,1,Active,8,2
+10,1,Team A,0,1,Active,6,2
