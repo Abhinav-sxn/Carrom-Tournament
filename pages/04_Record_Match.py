@@ -245,14 +245,14 @@ with record_col:
     # ---- Match selector (only scheduled matches) ---------------------------
     scheduled = matches_df[matches_df["status"] == "scheduled"].copy()
     # Normalize datetimes and sort by scheduled date + time so ordering matches Home
-    scheduled["_sched_dt"] = pd.to_datetime(scheduled.get("scheduled_date", None), dayfirst=True, errors="coerce")
+    scheduled["_sched_dt"] = pd.to_datetime(scheduled.get("scheduled_date", None), dayfirst=False, errors="coerce")
     scheduled["_sched_dt_time"] = pd.NaT
     if "scheduled_time" in scheduled.columns:
         has_time = scheduled["scheduled_time"].notna() & (scheduled["scheduled_time"].astype(str).str.strip() != "")
         if has_time.any():
             combined = (scheduled.loc[has_time, "scheduled_date"].astype(str).str.strip()
                         + " " + scheduled.loc[has_time, "scheduled_time"].astype(str).str.strip())
-            scheduled.loc[has_time, "_sched_dt_time"] = pd.to_datetime(combined, dayfirst=True, errors="coerce")
+            scheduled.loc[has_time, "_sched_dt_time"] = pd.to_datetime(combined, dayfirst=False, errors="coerce")
     scheduled = scheduled.sort_values(["_sched_dt", "_sched_dt_time", "round", "match_id"], na_position="last", kind="mergesort")
 
     if scheduled.empty:

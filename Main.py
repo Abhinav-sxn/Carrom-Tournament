@@ -110,8 +110,8 @@ def _home():
             ].copy()
 
             if not upcoming.empty and not teams_df.empty:
-                # normalize scheduled_date to datetimes for robust sorting (accept day-first formats)
-                upcoming["_sched_dt"] = pd.to_datetime(upcoming.get("scheduled_date", None), dayfirst=True, errors="coerce")
+                # normalize scheduled_date to datetimes for robust sorting
+                upcoming["_sched_dt"] = pd.to_datetime(upcoming.get("scheduled_date", None), dayfirst=False, errors="coerce")
                 upcoming["_sched_date"] = upcoming["_sched_dt"].dt.date
                 # create a combined datetime (date + time) when time is provided; leave NaT when time is missing
                 upcoming["_sched_dt_time"] = pd.NaT
@@ -119,7 +119,7 @@ def _home():
                 if has_time.any():
                     combined = (upcoming.loc[has_time, "scheduled_date"].astype(str).str.strip()
                                 + " " + upcoming.loc[has_time, "scheduled_time"].astype(str).str.strip())
-                    upcoming.loc[has_time, "_sched_dt_time"] = pd.to_datetime(combined, dayfirst=True, errors="coerce")
+                    upcoming.loc[has_time, "_sched_dt_time"] = pd.to_datetime(combined, dayfirst=False, errors="coerce")
 
                 # sort by date then time (timed matches first). Use stable sort to preserve deterministic ordering.
                 upcoming = upcoming.sort_values(["_sched_dt", "_sched_dt_time", "round", "match_id"], na_position="last", kind="mergesort")
